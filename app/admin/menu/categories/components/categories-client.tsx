@@ -64,8 +64,7 @@ export function CategoriesClient({
   };
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm("Delete this category?");
-    if (!confirmed) return;
+    if (!confirm("Delete this category?")) return;
 
     const res = await fetch(`/api/admin/categories/${id}`, {
       method: "DELETE",
@@ -82,26 +81,24 @@ export function CategoriesClient({
           name_ar: editingCategory.name_ar ?? "",
           description_en: editingCategory.description_en ?? "",
           description_ar: editingCategory.description_ar ?? "",
-          is_visible: editingCategory.is_visible ?? true,
-          is_offers: editingCategory.is_offers ?? false,
           image_url: editingCategory.image_url ?? "",
+          is_visible: editingCategory.is_visible,
+          is_offers: editingCategory.is_offers,
         }
       : undefined;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold">Menu Categories</h1>
           <p className="text-sm text-muted-foreground">
-            Manage the categories for <span className="font-medium">{restaurantName}</span>.
+            Manage the categories for <strong>{restaurantName}</strong>.
           </p>
         </div>
         <Button onClick={openCreate}>+ Add Category</Button>
       </div>
 
-      {/* Table */}
       <div className="rounded-xl border bg-white shadow-sm">
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
@@ -112,13 +109,11 @@ export function CategoriesClient({
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-6 text-center text-muted-foreground"
-                >
+                <td colSpan={4} className="px-4 py-6 text-center opacity-60">
                   No categories yet.
                 </td>
               </tr>
@@ -150,31 +145,19 @@ export function CategoriesClient({
                 </td>
 
                 <td className="px-4 py-3">
-                  {cat.description_en || (
-                    <span className="opacity-40">—</span>
-                  )}
+                  {cat.description_en || <span className="opacity-40">—</span>}
                 </td>
 
                 <td className="px-4 py-3 space-x-2">
                   {cat.is_visible && <Badge>Visible</Badge>}
-                  {cat.is_offers && (
-                    <Badge variant="secondary">Offers</Badge>
-                  )}
+                  {cat.is_offers && <Badge variant="secondary">Offers</Badge>}
                 </td>
 
                 <td className="px-4 py-3 text-right space-x-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => openEdit(cat)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => openEdit(cat)}>
                     Edit
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(cat.id)}
-                  >
+                  <Button size="sm" variant="destructive" onClick={() => handleDelete(cat.id)}>
                     Delete
                   </Button>
                 </td>
@@ -184,14 +167,14 @@ export function CategoriesClient({
         </table>
       </div>
 
-      {/* Modal */}
-      <CategoryModal
-        open={modalOpen}
-        mode={mode}
-        initialValues={modalInitialValues}
-        onClose={() => setModalOpen(false)}
-        onSubmit={mode === "create" ? handleCreate : handleUpdate}
-      />
+<CategoryModal
+  key={modalOpen ? `${mode}-${editingCategory?.id || "new"}` : "closed"}
+  open={modalOpen}
+  mode={mode}
+  initialValues={modalInitialValues}
+  onClose={() => setModalOpen(false)}
+  onSubmit={mode === "create" ? handleCreate : handleUpdate}
+/>
     </div>
   );
 }

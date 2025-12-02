@@ -1,11 +1,7 @@
 // app/admin/menu/categories/components/category-modal.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import type {
-  ChangeEvent,
-  FormEvent,
-} from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +35,7 @@ const EMPTY_VALUES: CategoryFormValues = {
   image_url: "",
 };
 
-type CategoryModalProps = {
+type Props = {
   open: boolean;
   mode: "create" | "edit";
   initialValues?: CategoryFormValues;
@@ -53,168 +49,140 @@ export function CategoryModal({
   initialValues,
   onClose,
   onSubmit,
-}: CategoryModalProps) {
+}: Props) {
   const [values, setValues] = useState<CategoryFormValues>(EMPTY_VALUES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset form whenever modal opens OR mode changes
+  // ✅ Load the right values whenever the modal is opened
   useEffect(() => {
     if (!open) return;
 
     if (mode === "edit" && initialValues) {
       setValues(initialValues);
-    } else {
+    } else if (mode === "create") {
       setValues(EMPTY_VALUES);
     }
-
-    setError(null);
-    setLoading(false);
   }, [open, mode, initialValues]);
 
-  const handleTextChange =
+  // Only responsible for closing the dialog
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) onClose();
+  };
+
+  const handleField =
     (field: keyof CategoryFormValues) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const value = e.target.value;
-      setValues((prev) => ({ ...prev, [field]: value }));
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | boolean) => {
+      if (typeof e === "boolean") {
+        setValues((v) => ({ ...v, [field]: e }));
+      } else {
+        setValues((v) => ({ ...v, [field]: e.target.value }));
+      }
     };
 
-  const handleToggleChange =
-    (field: "is_visible" | "is_offers") => (checked: boolean) => {
-      setValues((prev) => ({ ...prev, [field]: checked }));
-    };
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
+    setError(null);
 
     try {
-      if (!values.name_en.trim()) {
-        setError("English name is required.");
-        setLoading(false);
-        return;
-      }
-
-      await onSubmit({
-        ...values,
-        name_en: values.name_en.trim(),
-        name_ar: values.name_ar.trim(),
-        description_en: values.description_en.trim(),
-        description_ar: values.description_ar.trim(),
-        image_url: values.image_url.trim(),
-      });
-
+      await onSubmit(values);
       onClose();
     } catch (err) {
-      console.error("[CategoryModal] submit error", err);
-      setError("Something went wrong. Please try again.");
+      console.error(err);
+      setError("Something went wrong.");
+    } finally {
       setLoading(false);
     }
   };
 
-  const title = mode === "create" ? "Add Category" : "Edit Category";
-  const description =
-    mode === "create"
-      ? "Create a new menu category for this restaurant."
-      : "Update this category’s details.";
-
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle>
+            {mode === "create" ? "Add Category" : "Edit Category"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "create"
+              ? "Create a new menu category."
+              : "Update this category’s details."}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1">
-            <Label htmlFor="name_en">Name (English)</Label>
+          <div>
+            <Label>Name (English)</Label>
             <Input
-              id="name_en"
-              value={values.name_en}
-              onChange={handleTextChange("name_en")}
               placeholder="e.g. Burgers"
+              value={values.name_en}
+              onChange={handleField("name_en")}
               required
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="name_ar">Name (Arabic)</Label>
+          <div>
+            <Label>Name (Arabic)</Label>
             <Input
-              id="name_ar"
-              value={values.name_ar}
-              onChange={handleTextChange("name_ar")}
               placeholder="مثال: برغر"
+              value={values.name_ar}
+              onChange={handleField("name_ar")}
               dir="rtl"
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="description_en">Description (English)</Label>
+          <div>
+            <Label>Description (English)</Label>
             <Textarea
-              id="description_en"
-              value={values.description_en}
-              onChange={handleTextChange("description_en")}
               placeholder="Short description shown under the category title."
+              value={values.description_en}
+              onChange={handleField("description_en")}
               rows={2}
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="description_ar">Description (Arabic)</Label>
+          <div>
+            <Label>Description (Arabic)</Label>
             <Textarea
-              id="description_ar"
-              value={values.description_ar}
-              onChange={handleTextChange("description_ar")}
               placeholder="وصف قصير يظهر تحت اسم الفئة."
-              rows={2}
+              value={values.description_ar}
+              onChange={handleField("description_ar")}
               dir="rtl"
+              rows={2}
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="image_url">Image URL</Label>
+          <div>
+            <Label>Image URL</Label>
             <Input
-              id="image_url"
+              placeholder="Paste an image URL (e.g., from Supabase Storage)"
               value={values.image_url}
-              onChange={handleTextChange("image_url")}
-              placeholder="Paste an image URL (e.g. from Supabase Storage)"
+              onChange={handleField("image_url")}
             />
           </div>
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex justify-between">
             <div className="flex items-center gap-2">
               <Switch
-                id="is_visible"
                 checked={values.is_visible}
-                onCheckedChange={handleToggleChange("is_visible")}
+                onCheckedChange={handleField("is_visible")}
               />
-              <Label htmlFor="is_visible">Visible in menu</Label>
+              <Label>Visible in menu</Label>
             </div>
+
             <div className="flex items-center gap-2">
               <Switch
-                id="is_offers"
                 checked={values.is_offers}
-                onCheckedChange={handleToggleChange("is_offers")}
+                onCheckedChange={handleField("is_offers")}
               />
-              <Label htmlFor="is_offers">Offers section</Label>
+              <Label>Offers section</Label>
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-red-600">{error}</p>}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
