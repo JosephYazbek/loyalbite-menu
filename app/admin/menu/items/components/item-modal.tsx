@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export type ItemFormValues = {
   id?: string;
@@ -77,8 +80,12 @@ type ItemModalProps = {
   mode: "create" | "edit";
   categories: any[];
   initialValues?: ItemFormValues;
-  onSubmit: (values: ItemFormValues) => Promise<void> | void;
+  onSubmit: (
+    values: ItemFormValues,
+    options?: { file?: File | null; removeExistingImage?: boolean }
+  ) => Promise<void> | void;
   loading?: boolean;
+  uploadingImage?: boolean;
 };
 
 const TAGS_CONFIG: {
@@ -107,22 +114,64 @@ export default function ItemModal({
   initialValues,
   onSubmit,
   loading,
+  uploadingImage,
 }: ItemModalProps) {
-const startingValues: ItemFormValues =
-  mode === "edit" && initialValues
-    ? { ...EMPTY_VALUES, ...initialValues }
-    : { ...EMPTY_VALUES };
+  const startingValues: ItemFormValues =
+    mode === "edit" && initialValues
+      ? { ...EMPTY_VALUES, ...initialValues }
+      : { ...EMPTY_VALUES };
 
-// Initialize state ONCE using startingValues
-const [values, setValues] = useState<ItemFormValues>(startingValues);
-// Reset form when modal is opened OR initialValues changes
-useEffect(() => {
-  if (mode === "edit" && initialValues) {
-    setValues({ ...EMPTY_VALUES, ...initialValues });
-  } else if (mode === "create") {
-    setValues({ ...EMPTY_VALUES });
-  }
-}, [open, mode, initialValues]);
+  const [values, setValues] = useState<ItemFormValues>(startingValues);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    startingValues.image_url || null
+  );
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
+
+  const isSaving = Boolean(loading);
+  const isUploadingImage = Boolean(uploadingImage);
+  const disableInteractions = isSaving || isUploadingImage;
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
+
+  const resetPreview = (url: string | null) => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
+    setPreviewUrl(url);
+  };
+
+  useEffect(() => {
+    if (mode === "edit" && initialValues) {
+      const merged = { ...EMPTY_VALUES, ...initialValues };
+      setValues(merged);
+      setSelectedFile(null);
+      resetPreview(merged.image_url || null);
+      setRemoveExistingImage(false);
+    } else if (mode === "create") {
+      setValues({ ...EMPTY_VALUES });
+      setSelectedFile(null);
+      resetPreview(null);
+      setRemoveExistingImage(false);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    setFileError(null);
+  }, [open, mode, initialValues]);
+
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current);
+      }
+    };
+  }, []);
 
   const handleChange =
     (field: keyof ItemFormValues) =>
@@ -156,8 +205,61 @@ useEffect(() => {
     }));
   };
 
+  const triggerFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
+      setFileError("Only JPG, PNG, or WEBP files are allowed.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setFileError("Image must be 5MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setFileError(null);
+    setSelectedFile(file);
+    setRemoveExistingImage(false);
+
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    previewObjectUrlRef.current = objectUrl;
+    setPreviewUrl(objectUrl);
+  };
+
+  const handleClearFile = () => {
+    const hadExisting = Boolean(values.image_url);
+    setValues((prev) => ({
+      ...prev,
+      image_url: "",
+    }));
+    setSelectedFile(null);
+    setFileError(null);
+    resetPreview(null);
+    setRemoveExistingImage(hadExisting);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (fileError) {
+      alert("Please resolve the image selection error before submitting.");
+      return;
+    }
 
     if (!values.category_id) {
       alert("Please select a category");
@@ -174,7 +276,10 @@ useEffect(() => {
       return;
     }
 
-    await onSubmit(values);
+    await onSubmit(values, {
+      file: selectedFile,
+      removeExistingImage,
+    });
   };
 
   const modalTitle = mode === "create" ? "Add New Item" : "Edit Item";
@@ -184,7 +289,10 @@ useEffect(() => {
       : "Update this menu item’s details.";
 
   return (
-    <Dialog open={open} onOpenChange={() => !loading && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={() => !disableInteractions && onClose()}
+    >
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>{modalTitle}</DialogTitle>
@@ -231,7 +339,7 @@ useEffect(() => {
                   <Switch
                     checked={values.is_visible}
                     onCheckedChange={handleToggle("is_visible")}
-                    disabled={loading}
+                    disabled={disableInteractions}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -239,7 +347,7 @@ useEffect(() => {
                   <Switch
                     checked={values.is_available}
                     onCheckedChange={handleToggle("is_available")}
-                    disabled={loading}
+                    disabled={disableInteractions}
                   />
                 </div>
               </div>
@@ -255,7 +363,7 @@ useEffect(() => {
                 value={values.name_en}
                 onChange={handleChange("name_en")}
                 placeholder="Chicken Burger"
-                disabled={loading}
+                disabled={disableInteractions}
               />
             </div>
 
@@ -267,7 +375,7 @@ useEffect(() => {
                 value={values.name_ar}
                 onChange={handleChange("name_ar")}
                 placeholder="برغر دجاج"
-                disabled={loading}
+                disabled={disableInteractions}
               />
             </div>
           </div>
@@ -281,7 +389,7 @@ useEffect(() => {
                 value={values.description_en}
                 onChange={handleChange("description_en")}
                 placeholder="Grilled chicken breast, lettuce, tomato, house sauce..."
-                disabled={loading}
+                disabled={disableInteractions}
                 rows={3}
               />
             </div>
@@ -294,7 +402,7 @@ useEffect(() => {
                 value={values.description_ar}
                 onChange={handleChange("description_ar")}
                 placeholder="صدر دجاج مشوي مع خس وطماطم وصلصة خاصة..."
-                disabled={loading}
+                disabled={disableInteractions}
                 rows={3}
               />
             </div>
@@ -312,7 +420,7 @@ useEffect(() => {
                 value={values.price}
                 onChange={handleChange("price")}
                 placeholder="10.00"
-                disabled={loading}
+                disabled={disableInteractions}
               />
             </div>
 
@@ -323,7 +431,7 @@ useEffect(() => {
                 value={values.primary_currency}
                 onChange={handleChange("primary_currency")}
                 placeholder="USD"
-                disabled={loading}
+                disabled={disableInteractions}
               />
             </div>
 
@@ -337,26 +445,79 @@ useEffect(() => {
                 value={values.secondary_price ?? ""}
                 onChange={handleChange("secondary_price")}
                 placeholder="e.g. LBP equivalent"
-                disabled={loading}
+                disabled={disableInteractions}
               />
             </div>
           </div>
 
           {/* Image + Code / Order */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="image_url">Image URL</Label>
-              <Input
-                id="image_url"
-                value={values.image_url}
-                onChange={handleChange("image_url")}
-                placeholder="https://..."
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground">
-                Later you can switch this to direct upload (Supabase Storage). For
-                now, paste an image URL.
-              </p>
+            <div className="space-y-3 md:col-span-2">
+              <Label>Item image</Label>
+              <div className="flex flex-col gap-4 md:flex-row">
+                <div className="relative h-32 w-full max-w-xs overflow-hidden rounded-md border bg-muted">
+                  {previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewUrl}
+                      alt={values.name_en || "Item preview"}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                      No image selected
+                    </div>
+                  )}
+                  {disableInteractions && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium">
+                      {isUploadingImage ? "Uploading..." : "Saving..."}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-1 flex-col gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={disableInteractions}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={triggerFilePicker}
+                      disabled={disableInteractions}
+                    >
+                      {selectedFile ? "Change file" : "Upload image"}
+                    </Button>
+                    {(selectedFile || values.image_url) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleClearFile}
+                        disabled={disableInteractions}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {selectedFile && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedFile.name} &middot;{" "}
+                      {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG, or WEBP up to 5MB.
+                  </p>
+                  {fileError && (
+                    <p className="text-xs text-red-500">{fileError}</p>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -366,7 +527,7 @@ useEffect(() => {
                 value={values.item_code}
                 onChange={handleChange("item_code")}
                 placeholder="e.g. B101"
-                disabled={loading}
+                disabled={disableInteractions}
               />
               <div className="mt-3 space-y-2">
                 <Label htmlFor="display_order">Display order</Label>
@@ -380,7 +541,7 @@ useEffect(() => {
                       display_order: Number(e.target.value) || 0,
                     }))
                   }
-                  disabled={loading}
+                  disabled={disableInteractions}
                 />
               </div>
             </div>
@@ -398,7 +559,7 @@ useEffect(() => {
                     key={tag.key}
                     type="button"
                     onClick={() => handleTagToggle(tag.key)}
-                    disabled={loading}
+                    disabled={disableInteractions}
                     className={cn(
                       "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition",
                       active
@@ -419,13 +580,15 @@ useEffect(() => {
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={loading}
+              disabled={disableInteractions}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading
-                ? mode === "create"
+            <Button type="submit" disabled={disableInteractions}>
+              {disableInteractions
+                ? isUploadingImage
+                  ? "Uploading..."
+                  : mode === "create"
                   ? "Creating..."
                   : "Saving..."
                 : mode === "create"

@@ -1,7 +1,7 @@
 // app/admin/menu/categories/components/category-modal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+
+const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export type CategoryFormValues = {
   name_en: string;
@@ -40,7 +43,11 @@ type Props = {
   mode: "create" | "edit";
   initialValues?: CategoryFormValues;
   onClose: () => void;
-  onSubmit: (values: CategoryFormValues) => Promise<void>;
+  onSubmit: (
+    values: CategoryFormValues,
+    options?: { file?: File | null; removeExistingImage?: boolean }
+  ) => Promise<void>;
+  uploadingImage?: boolean;
 };
 
 export function CategoryModal({
@@ -49,25 +56,63 @@ export function CategoryModal({
   initialValues,
   onClose,
   onSubmit,
+  uploadingImage,
 }: Props) {
   const [values, setValues] = useState<CategoryFormValues>(EMPTY_VALUES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
 
-  // ✅ Load the right values whenever the modal is opened
+  const isUploading = Boolean(uploadingImage);
+  const isBusy = loading || isUploading;
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
+
+  const resetPreview = (url: string | null) => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
+    setPreviewUrl(url);
+  };
+
+  // Load the right values whenever the modal is opened
   useEffect(() => {
     if (!open) return;
 
     if (mode === "edit" && initialValues) {
       setValues(initialValues);
+      setSelectedFile(null);
+      resetPreview(initialValues.image_url || null);
+      setRemoveExistingImage(false);
     } else if (mode === "create") {
       setValues(EMPTY_VALUES);
+      setSelectedFile(null);
+      resetPreview(null);
+      setRemoveExistingImage(false);
     }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    setFileError(null);
   }, [open, mode, initialValues]);
 
-  // Only responsible for closing the dialog
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current);
+      }
+    };
+  }, []);
+
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) onClose();
+    if (!isOpen && !isBusy) onClose();
   };
 
   const handleField =
@@ -80,13 +125,67 @@ export function CategoryModal({
       }
     };
 
+  const triggerFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
+      setFileError("Only JPG, PNG, or WEBP files are allowed.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setFileError("Image must be 5MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setFileError(null);
+    setSelectedFile(file);
+    setRemoveExistingImage(false);
+
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+
+    const url = URL.createObjectURL(file);
+    previewObjectUrlRef.current = url;
+    setPreviewUrl(url);
+  };
+
+  const handleClearFile = () => {
+    const hadExisting = Boolean(values.image_url);
+    setValues((prev) => ({ ...prev, image_url: "" }));
+    setSelectedFile(null);
+    setFileError(null);
+    resetPreview(null);
+    setRemoveExistingImage(hadExisting);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (fileError) {
+      setError(fileError);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      await onSubmit(values);
+      await onSubmit(values, {
+        file: selectedFile,
+        removeExistingImage,
+      });
       onClose();
     } catch (err) {
       console.error(err);
@@ -118,6 +217,7 @@ export function CategoryModal({
               value={values.name_en}
               onChange={handleField("name_en")}
               required
+              disabled={isBusy}
             />
           </div>
 
@@ -128,6 +228,7 @@ export function CategoryModal({
               value={values.name_ar}
               onChange={handleField("name_ar")}
               dir="rtl"
+              disabled={isBusy}
             />
           </div>
 
@@ -138,6 +239,7 @@ export function CategoryModal({
               value={values.description_en}
               onChange={handleField("description_en")}
               rows={2}
+              disabled={isBusy}
             />
           </div>
 
@@ -149,16 +251,76 @@ export function CategoryModal({
               onChange={handleField("description_ar")}
               dir="rtl"
               rows={2}
+              disabled={isBusy}
             />
           </div>
 
-          <div>
-            <Label>Image URL</Label>
-            <Input
-              placeholder="Paste an image URL (e.g., from Supabase Storage)"
-              value={values.image_url}
-              onChange={handleField("image_url")}
-            />
+          <div className="space-y-2">
+            <Label>Category image</Label>
+            <div className="flex flex-col gap-3">
+              <div className="relative h-32 w-full overflow-hidden rounded-md border bg-muted">
+                {previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl}
+                    alt={values.name_en || "Category preview"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                    No image selected
+                  </div>
+                )}
+                {isBusy && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium">
+                    {isUploading ? "Uploading..." : "Saving..."}
+                  </div>
+                )}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={isBusy}
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={triggerFilePicker}
+                  disabled={isBusy}
+                >
+                  {selectedFile ? "Change file" : "Upload image"}
+                </Button>
+                {(selectedFile || values.image_url) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleClearFile}
+                    disabled={isBusy}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+
+              {selectedFile && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedFile.name} &middot;{" "}
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                JPG, PNG, or WEBP up to 5MB.
+              </p>
+              {fileError && (
+                <p className="text-xs text-red-500">{fileError}</p>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-between">
@@ -166,6 +328,7 @@ export function CategoryModal({
               <Switch
                 checked={values.is_visible}
                 onCheckedChange={handleField("is_visible")}
+                disabled={isBusy}
               />
               <Label>Visible in menu</Label>
             </div>
@@ -174,6 +337,7 @@ export function CategoryModal({
               <Switch
                 checked={values.is_offers}
                 onCheckedChange={handleField("is_offers")}
+                disabled={isBusy}
               />
               <Label>Offers section</Label>
             </div>
@@ -182,11 +346,22 @@ export function CategoryModal({
           {error && <p className="text-red-600">{error}</p>}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isBusy}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : mode === "create" ? "Create" : "Save"}
+            <Button type="submit" disabled={isBusy}>
+              {isBusy
+                ? isUploading
+                  ? "Uploading..."
+                  : "Saving..."
+                : mode === "create"
+                ? "Create"
+                : "Save"}
             </Button>
           </div>
         </form>

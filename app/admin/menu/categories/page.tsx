@@ -47,6 +47,7 @@ export default async function CategoriesPage() {
   return (
     <CategoriesClient
       restaurantName={restaurant.name}
+      restaurantId={restaurantId}
       initialCategories={(categories ?? []) as Category[]}
     />
   );
