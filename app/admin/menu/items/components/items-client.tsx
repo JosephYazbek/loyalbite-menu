@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { GripVertical, Loader2 } from "lucide-react";
 import { uploadItemImage, removeItemImage } from "@/lib/client-uploads";
+import { useAdminWorkspace } from "@/components/admin-shell";
 
 type ItemsClientProps = {
   categories: any[];
@@ -20,6 +21,7 @@ export default function ItemsClient({
   categories,
   items: initialItems,
 }: ItemsClientProps) {
+  const { selectedRestaurant } = useAdminWorkspace();
   const [items, setItems] = useState(initialItems);
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
@@ -380,8 +382,25 @@ export default function ItemsClient({
           <Button asChild variant="outline">
             <Link href="/admin/menu/categories">View Categories</Link>
           </Button>
+          <Button
+            asChild
+            variant="outline"
+            disabled={!selectedRestaurant?.slug}
+          >
+            <Link
+              href={
+                selectedRestaurant?.slug
+                  ? `/m/${selectedRestaurant.slug}`
+                  : "#"
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              Preview Menu
+            </Link>
+          </Button>
           <Button onClick={handleAddClick} disabled={!canInteract}>
-            Add Item
+            + Add Item
           </Button>
         </div>
       </div>

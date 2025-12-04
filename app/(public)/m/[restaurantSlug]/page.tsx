@@ -10,15 +10,6 @@ type PageProps = {
   params: Promise<{ restaurantSlug: string }>;
 };
 
-type RestaurantRecord = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logo_url: string | null;
-  primary_color: string | null;
-};
-
 type CategoryRecord = {
   id: string;
   name_en: string | null;
@@ -45,6 +36,37 @@ type ItemRecord = {
   display_order: number | null;
 };
 
+const TAG_BADGES: Record<
+  string,
+  { label: string; className: string }
+> = {
+  is_new: {
+    label: "New",
+    className: "border-white/20 bg-white/10 text-white",
+  },
+  is_popular: {
+    label: "Popular",
+    className:
+      "border-[rgba(253,187,45,0.4)] bg-[rgba(253,187,45,0.15)] text-[rgba(253,187,45,0.95)]",
+  },
+  is_spicy: {
+    label: "Spicy",
+    className: "border-red-400/40 bg-red-400/20 text-red-100",
+  },
+  is_vegetarian: {
+    label: "Vegetarian",
+    className: "border-emerald-400/40 bg-emerald-400/20 text-emerald-100",
+  },
+  is_vegan: {
+    label: "Vegan",
+    className: "border-green-300/40 bg-green-300/15 text-green-100",
+  },
+  is_gluten_free: {
+    label: "Gluten-Free",
+    className: "border-sky-300/40 bg-sky-300/15 text-sky-100",
+  },
+};
+
 const formatPrice = (
   value: number | string | null | undefined,
   currency?: string | null
@@ -67,64 +89,57 @@ const formatPrice = (
 export default async function PublicMenuPage({ params }: PageProps) {
   const { restaurantSlug } = await params;
   noStore();
-  const supabase = await createSupabaseServerClient();
 
-  const { data: restaurant, error: restaurantError } = await supabase
+  const supabase = await createSupabaseServerClient();
+  const { data: restaurant, error } = await supabase
     .from("restaurants")
     .select("id, name, slug, description, logo_url, primary_color")
     .eq("slug", restaurantSlug)
     .maybeSingle();
 
-  if (restaurantError) {
-    console.error("[PUBLIC MENU] restaurant error", restaurantError);
+  if (error) {
+    console.error("[PUBLIC MENU] restaurant fetch error", error);
   }
 
   if (!restaurant) {
     notFound();
   }
 
-  const [{ data: categoriesData, error: categoriesError }, { data: itemsData, error: itemsError }] =
-    await Promise.all([
-      supabase
-        .from("categories")
-        .select("id, name_en, description_en, display_order")
-    .eq("restaurant_id", restaurant.id)
-        .eq("is_visible", true)
-        .order("display_order", { ascending: true }),
-      supabase
-        .from("items")
-        .select(
-          "id, category_id, name_en, description_en, price, secondary_price, primary_currency, secondary_currency, image_url, is_new, is_popular, is_spicy, is_vegetarian, is_vegan, is_gluten_free, display_order"
-        )
-        .eq("restaurant_id", restaurant.id)
-        .eq("is_visible", true)
-        .eq("is_available", true)
-        .order("display_order", { ascending: true }),
-    ]);
-
-  if (categoriesError) {
-    console.error("[PUBLIC MENU] categories error", categoriesError);
-  }
-
-  if (itemsError) {
-    console.error("[PUBLIC MENU] items error", itemsError);
-  }
+  const [{ data: categoriesData }, { data: itemsData }] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, name_en, description_en, display_order")
+      .eq("restaurant_id", restaurant.id)
+      .eq("is_visible", true)
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("items")
+      .select(
+        "id, category_id, name_en, description_en, price, secondary_price, primary_currency, secondary_currency, image_url, is_new, is_popular, is_spicy, is_vegetarian, is_vegan, is_gluten_free, display_order"
+      )
+      .eq("restaurant_id", restaurant.id)
+      .eq("is_visible", true)
+      .eq("is_available", true)
+      .order("display_order", { ascending: true }),
+  ]);
 
   const itemsByCategory = new Map<string, ItemRecord[]>();
   (itemsData ?? []).forEach((item) => {
-    const list = itemsByCategory.get(item.category_id) ?? [];
-    list.push(item);
-    itemsByCategory.set(item.category_id, list);
+    const group = itemsByCategory.get(item.category_id) ?? [];
+    group.push(item);
+    itemsByCategory.set(item.category_id, group);
   });
 
   const categories = (categoriesData ?? [])
     .map((category) => ({
       ...category,
-      items: itemsByCategory.get(category.id) ?? [],
+      items: (itemsByCategory.get(category.id) ?? []).sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+      ),
     }))
     .filter((category) => category.items.length > 0);
 
-  const accentColor = restaurant.primary_color?.trim() || "#0f172a";
+  const accentColor = restaurant.primary_color?.trim() || "#fdbb2d";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -153,9 +168,30 @@ export default async function PublicMenuPage({ params }: PageProps) {
             )}
           </div>
         </div>
+
+        {categories.length > 0 && (
+          <div className="mx-auto mt-8 w-full max-w-4xl px-6">
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.25em] text-white/70">
+                Jump to category
+              </p>
+              <nav className="-mx-1 mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1">
+                {categories.map((category) => (
+                  <a
+                    key={category.id}
+                    href={`#cat-${category.id}`}
+                    className="snap-start rounded-2xl border border-white/20 bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:border-white/60 hover:bg-white/40"
+                  >
+                    {category.name_en || "Category"}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          </div>
+        )}
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         {categories.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm">
             This menu is being updated. Please check back soon.
@@ -163,10 +199,17 @@ export default async function PublicMenuPage({ params }: PageProps) {
         ) : (
           <div className="space-y-10">
             {categories.map((category) => (
-              <section key={category.id} className="scroll-mt-16" id={category.id}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+              <section
+                key={category.id}
+                id={`cat-${category.id}`}
+                className="scroll-mt-24"
+              >
+                <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-baseline sm:justify-between">
                   <div>
-                    <h2 className="text-2xl font-semibold text-slate-900">
+                    <p className="text-xs uppercase tracking-[0.25em] text-amber-600/80">
+                      Curated selection
+                    </p>
+                    <h2 className="mt-1 text-2xl font-semibold text-slate-900">
                       {category.name_en || "Untitled"}
                     </h2>
                     {category.description_en && (
@@ -175,6 +218,10 @@ export default async function PublicMenuPage({ params }: PageProps) {
                       </p>
                     )}
                   </div>
+                  <span className="text-xs uppercase tracking-[0.35em] text-slate-500">
+                    {category.items.length}{" "}
+                    {category.items.length === 1 ? "item" : "items"}
+                  </span>
                 </div>
 
                 <div className="mt-4 grid gap-4">
@@ -191,15 +238,15 @@ export default async function PublicMenuPage({ params }: PageProps) {
                     return (
                       <article
                         key={item.id}
-                        className="flex gap-4 rounded-3xl border bg-white/90 p-4 shadow-sm transition hover:shadow-md sm:gap-6 sm:p-5"
+                        className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md sm:flex-row sm:gap-6 sm:p-5"
                       >
-                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-100 sm:h-24 sm:w-24">
+                        <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 sm:h-28 sm:w-28">
                           {item.image_url ? (
                             <Image
                               src={item.image_url}
                               alt={item.name_en ?? ""}
                               fill
-                              sizes="96px"
+                              sizes="112px"
                               className="object-cover"
                             />
                           ) : (
@@ -211,8 +258,8 @@ export default async function PublicMenuPage({ params }: PageProps) {
 
                         <div className="flex flex-1 flex-col gap-3">
                           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="space-y-1">
-                              <h3 className="text-lg font-semibold">
+                            <div>
+                              <h3 className="text-lg font-semibold text-slate-900">
                                 {item.name_en}
                               </h3>
                               {item.description_en && (
@@ -233,7 +280,7 @@ export default async function PublicMenuPage({ params }: PageProps) {
 
                           <div className="flex flex-wrap gap-2 text-xs text-slate-600">
                             {item.is_new && (
-                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-orange-700">
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
                                 New
                               </span>
                             )}
@@ -273,6 +320,10 @@ export default async function PublicMenuPage({ params }: PageProps) {
           </div>
         )}
       </main>
+
+      <footer className="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500">
+        Powered by LoyalBite — crafted for premium dining experiences.
+      </footer>
     </div>
   );
 }
