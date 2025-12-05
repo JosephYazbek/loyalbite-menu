@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { ensureSlug } from "@/lib/slug";
+import { normalizeBranchSlugs } from "@/lib/branch-slug";
 
 type RestaurantRecord = {
   id: string;
@@ -21,15 +23,6 @@ type BranchDBRecord = {
   created_at: string;
   updated_at: string;
 };
-
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-");
-}
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -78,13 +71,15 @@ export async function GET() {
     .eq("restaurant_id", restaurantId)
     .order("created_at", { ascending: true });
 
-  const safeBranches = (branches ?? []).map((b) => {
-    const record = b as BranchDBRecord;
-    return {
-      ...record,
-      whatsapp: record.whatsapp_number,
-    };
-  });
+  const normalizedBranches = await normalizeBranchSlugs(
+    supabase,
+    (branches ?? []) as BranchDBRecord[]
+  );
+
+  const safeBranches = normalizedBranches.map((record) => ({
+    ...record,
+    whatsapp: record.whatsapp_number,
+  }));
 
   return NextResponse.json({
     restaurant,
@@ -143,8 +138,7 @@ export async function POST(req: Request) {
 
   const restaurantId = membershipRow.restaurant_id;
 
-  const finalSlug =
-    slugInput && slugInput.length > 0 ? slugify(slugInput) : slugify(name);
+  const finalSlug = ensureSlug(slugInput, name);
 
   // 2) Insert new branch
   const { data: inserted, error: insertError } = await supabase

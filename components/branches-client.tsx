@@ -6,6 +6,9 @@ import {
   OpeningHours,
   ensureOpeningHours,
 } from "@/components/branch-hours-editor";
+import { Button } from "@/components/ui/button";
+import { getPublicMenuUrl } from "@/lib/public-menu";
+import { slugify } from "@/lib/slug";
 
 type BranchRecord = {
   id: string;
@@ -57,20 +60,13 @@ const EMPTY_FORM: FormState = {
   opening_hours: ensureOpeningHours(null),  // ✅ FIXED
 };
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-");
-}
 
 export function BranchesClient() {
   const [restaurant, setRestaurant] = useState<RestaurantRecord | null>(null);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [copiedBranchId, setCopiedBranchId] = useState<string | null>(null);
 
   const [formMode, setFormMode] = useState<FormMode>("create");
   const [formOpen, setFormOpen] = useState<boolean>(false);
@@ -133,13 +129,22 @@ export function BranchesClient() {
   };
 
   const handleChange = (field: keyof FormState, value: unknown) => {
-    setFormState((prev) => ({
-      ...prev,
-      [field]: value,
-      ...(field === "name" && !prev.slug
-        ? { slug: slugify(value as string) }
-        : {}),
-    }));
+    setFormState((prev) => {
+      if (field === "slug") {
+        return { ...prev, slug: slugify(String(value ?? "")) };
+      }
+
+      const next: FormState = {
+        ...prev,
+        [field]: value,
+      };
+
+      if (field === "name" && !prev.slug) {
+        next.slug = slugify(String(value ?? ""));
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,9 +152,11 @@ export function BranchesClient() {
     setApiState({ status: "loading" });
 
     try {
+      const safeSlug = slugify(formState.slug || formState.name);
+
       const payload = {
         name: formState.name,
-        slug: formState.slug,
+        slug: safeSlug,
         address: formState.address,
         phone: formState.phone,
         whatsapp: formState.whatsapp,
@@ -207,27 +214,53 @@ export function BranchesClient() {
     }
   };
 
+  useEffect(() => {
+    if (!copiedBranchId) return;
+    const timeout = setTimeout(() => setCopiedBranchId(null), 2000);
+    return () => clearTimeout(timeout);
+  }, [copiedBranchId]);
+
+  const handleCopyLink = async (branchId: string, url: string | null) => {
+    if (!url) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+      setCopiedBranchId(branchId);
+    } catch (error) {
+      console.error(error);
+      alert("Unable to copy link");
+    }
+  };
+
+  const handlePreview = (url: string | null) => {
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   // UI ----------------------
 
-  if (loading) return <p>Loading branches…</p>;
+  if (loading) return <p>Loading branches...</p>;
   if (loadError) return <p className="text-red-600">{loadError}</p>;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-lg font-semibold">Branches</h1>
-          <p className="text-sm text-gray-600">
-            Manage your branch locations and opening hours.
-          </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-lg font-semibold">Branches</h1>
+                <p className="text-sm text-gray-600">
+                  Manage your branch locations and opening hours.
+                </p>
         </div>
 
-        <button
-          onClick={openCreateForm}
-          className="bg-black text-white px-4 py-2 rounded-md"
-        >
-          + Add Branch
-        </button>
+        <Button onClick={openCreateForm}>+ Add Branch</Button>
       </div>
 
       {branches.length === 0 ? (
@@ -235,21 +268,24 @@ export function BranchesClient() {
           No branches yet.
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {branches.map((branch) => (
-            <div key={branch.id} className="border rounded-md p-4 space-y-2">
-              <div className="flex justify-between">
+            <div
+              key={branch.id}
+              className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{branch.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     /m/{restaurant?.slug}/{branch.slug}
                   </p>
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded ${
+                  className={`text-xs px-2 py-0.5 rounded-full ${
                     branch.is_active
                       ? "bg-green-100 text-green-700"
-                      : "bg-gray-200 text-gray-600"
+                      : "bg-slate-200 text-slate-600"
                   }`}
                 >
                   {branch.is_active ? "Active" : "Inactive"}
@@ -257,19 +293,51 @@ export function BranchesClient() {
               </div>
 
               {branch.address && (
-                <p className="text-sm text-gray-600">{branch.address}</p>
+                <p className="text-sm text-slate-600">{branch.address}</p>
               )}
 
-              <div className="flex justify-between mt-3 text-xs">
+              {restaurant?.slug ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    variant="secondary"
+                    className="text-sm"
+                    disabled={!restaurant.slug}
+                    onClick={() =>
+                      handleCopyLink(
+                        branch.id,
+                        getPublicMenuUrl(restaurant.slug, branch.slug)
+                      )
+                    }
+                  >
+                    Copy Menu Link
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-sm"
+                    onClick={() =>
+                      handlePreview(
+                        getPublicMenuUrl(restaurant.slug, branch.slug)
+                      )
+                    }
+                  >
+                    Preview Menu
+                  </Button>
+                  {copiedBranchId === branch.id && (
+                    <span className="text-xs text-green-600">Copied!</span>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="flex justify-between text-xs text-slate-500">
                 <button
                   onClick={() => openEditForm(branch)}
-                  className="text-blue-600"
+                  className="font-medium text-blue-600 hover:underline"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(branch)}
-                  className="text-red-600"
+                  className="font-medium text-red-600 hover:underline"
                 >
                   Delete
                 </button>
@@ -280,13 +348,18 @@ export function BranchesClient() {
       )}
 
       {formOpen && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center">
-          <div className="bg-white rounded-md p-6 w-full max-w-xl max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4 py-8">
+          <div className="w-full max-w-xl space-y-6 overflow-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex justify-between mb-4">
               <h2 className="font-semibold">
                 {formMode === "create" ? "Add Branch" : "Edit Branch"}
               </h2>
-              <button onClick={closeForm}>Close</button>
+              <button
+                onClick={closeForm}
+                className="text-sm text-slate-500 hover:text-slate-900"
+              >
+                Close
+              </button>
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
@@ -364,19 +437,15 @@ export function BranchesClient() {
               />
 
               {/* submit */}
-              <button
-                type="submit"
-                className="bg-black text-white px-4 py-2 rounded-md"
-                disabled={apiState.status === "loading"}
-              >
+              <Button type="submit" disabled={apiState.status === "loading"}>
                 {formMode === "create"
                   ? apiState.status === "loading"
                     ? "Creating…"
                     : "Create Branch"
                   : apiState.status === "loading"
-                  ? "Saving…"
-                  : "Save Changes"}
-              </button>
+                    ? "Saving…"
+                    : "Save Changes"}
+              </Button>
             </form>
           </div>
         </div>
@@ -384,3 +453,5 @@ export function BranchesClient() {
     </div>
   );
 }
+
+

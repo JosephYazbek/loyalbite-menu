@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ItemModal, { ItemFormValues } from "./item-modal";
 import { Button } from "@/components/ui/button";
@@ -10,18 +10,26 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { GripVertical, Loader2 } from "lucide-react";
 import { uploadItemImage, removeItemImage } from "@/lib/client-uploads";
-import { useAdminWorkspace } from "@/components/admin-shell";
+import { getPublicMenuUrl } from "@/lib/public-menu";
 
 type ItemsClientProps = {
   categories: any[];
   items: any[];
+  branches?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    is_active: boolean;
+  }>;
+  restaurantSlug?: string | null;
 };
 
 export default function ItemsClient({
   categories,
   items: initialItems,
+  branches = [],
+  restaurantSlug,
 }: ItemsClientProps) {
-  const { selectedRestaurant } = useAdminWorkspace();
   const [items, setItems] = useState(initialItems);
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
@@ -30,6 +38,7 @@ export default function ItemsClient({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | "">("");
 
   const categoriesById = useMemo(() => {
     const map: Record<string, any> = {};
@@ -38,6 +47,22 @@ export default function ItemsClient({
   }, [categories]);
 
   const canInteract = !(saving || uploadingImage || reordering);
+
+  useEffect(() => {
+    const initialId =
+      branches.find((b) => b.is_active)?.id ?? branches[0]?.id ?? "";
+    setSelectedBranchId((prev) => (prev ? prev : initialId ?? ""));
+  }, [branches]);
+
+  const selectedBranch = useMemo(
+    () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
+    [branches, selectedBranchId]
+  );
+
+  const previewUrl =
+    selectedBranch && restaurantSlug
+      ? getPublicMenuUrl(restaurantSlug, selectedBranch.slug)
+      : null;
 
   const handleAddClick = () => {
     setMode("create");
@@ -379,25 +404,41 @@ export default function ItemsClient({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Branch
+            </span>
+            <select
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={selectedBranchId}
+              onChange={(event) => setSelectedBranchId(event.target.value)}
+            >
+              <option value="">Select branch</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                  {!branch.is_active ? " (inactive)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <Button asChild variant="outline">
             <Link href="/admin/menu/categories">View Categories</Link>
           </Button>
           <Button
-            asChild
             variant="outline"
-            disabled={!selectedRestaurant?.slug}
+            disabled={!previewUrl}
+            title={previewUrl ? undefined : "Select a branch first"}
+            asChild={Boolean(previewUrl)}
           >
-            <Link
-              href={
-                selectedRestaurant?.slug
-                  ? `/m/${selectedRestaurant.slug}`
-                  : "#"
-              }
-              target="_blank"
-              rel="noreferrer"
-            >
-              Preview Menu
-            </Link>
+            {previewUrl ? (
+              <a href={previewUrl} target="_blank" rel="noreferrer">
+                Preview Menu
+              </a>
+            ) : (
+              <span>Preview Menu</span>
+            )}
           </Button>
           <Button onClick={handleAddClick} disabled={!canInteract}>
             + Add Item

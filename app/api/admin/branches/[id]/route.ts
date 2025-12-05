@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { ensureSlug } from "@/lib/slug";
 
 /**
  * DELETE /api/admin/branches/:id
@@ -54,10 +55,11 @@ export async function PUT(
   }
 
   const body = await req.json();
+  const safeSlug = ensureSlug(body.slug, body.name || "");
 
   const payload = {
     name: body.name,
-    slug: body.slug,
+    slug: safeSlug,
     address: body.address,
     phone: body.phone,
     whatsapp_number: body.whatsapp,

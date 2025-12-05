@@ -1,12 +1,19 @@
 // app/admin/menu/items/page.tsx
 
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { normalizeBranchSlugs } from "@/lib/branch-slug";
 import ItemsClient from "./components/items-client";
+
+type BranchRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+};
 
 export default async function ItemsPage() {
   const supabase = await createSupabaseServerClient();
 
-  // Load categories (for dropdown + grouping)
   const { data: categoriesData } = await supabase
     .from("categories")
     .select(
@@ -24,7 +31,6 @@ export default async function ItemsPage() {
     )
     .order("display_order", { ascending: true });
 
-  // Load items
   const { data: itemsData } = await supabase
     .from("items")
     .select(
@@ -60,5 +66,52 @@ export default async function ItemsPage() {
   const categories = categoriesData ?? [];
   const items = itemsData ?? [];
 
-  return <ItemsClient categories={categories} items={items} />;
+  const inferredRestaurantId =
+    categories[0]?.restaurant_id ?? items[0]?.restaurant_id ?? null;
+
+  let restaurantSlug: string | null = null;
+  let branches: BranchRecord[] = [];
+
+  if (inferredRestaurantId) {
+    const [{ data: restaurantRecord }, { data: branchData }] =
+      await Promise.all([
+        supabase
+          .from("restaurants")
+          .select("slug")
+          .eq("id", inferredRestaurantId)
+          .maybeSingle(),
+        supabase
+          .from("branches")
+          .select("id, name, slug, is_active")
+          .eq("restaurant_id", inferredRestaurantId)
+          .order("name", { ascending: true }),
+      ]);
+
+    restaurantSlug = restaurantRecord?.slug ?? null;
+
+    const normalizedBranchRows = await normalizeBranchSlugs(
+      supabase,
+      (branchData ?? []) as Array<{
+        id: string;
+        name: string | null;
+        slug: string | null;
+      }>
+    );
+
+    branches = normalizedBranchRows.map((branch) => ({
+      id: branch.id,
+      name: branch.name,
+      slug: branch.slug ?? "",
+      is_active: branch.is_active ?? true,
+    }));
+  }
+
+  return (
+    <ItemsClient
+      categories={categories}
+      items={items}
+      branches={branches}
+      restaurantSlug={restaurantSlug}
+    />
+  );
 }
