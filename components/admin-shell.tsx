@@ -119,9 +119,9 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
 
   return (
     <AdminWorkspaceContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="min-h-screen bg-background text-foreground transition-colors">
         <div className="flex min-h-screen">
-          <aside className="hidden md:flex w-64 flex-col border-r bg-white">
+          <aside className="hidden md:flex w-64 flex-col border-r bg-card">
             <div className="px-6 py-6 border-b">
               <Link href="/" className="flex items-center gap-2 font-semibold">
                 <UtensilsCrossed className="size-5 text-primary" />
@@ -152,7 +152,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
           </aside>
 
           <div className="flex flex-1 flex-col">
-            <header className="sticky top-0 z-20 border-b bg-white/80 backdrop-blur">
+            <header className="sticky top-0 z-20 border-b bg-card/80 backdrop-blur">
               <div className="flex items-center gap-4 px-4 py-4 md:px-8">
                 <div className="flex flex-1 items-center gap-3">
                   <div className="md:hidden">
@@ -194,7 +194,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
                       {user.email}
                     </p>
                   </div>
-                  <Avatar className="size-10">
+                  <Avatar className="size-10 border border-border">
                     {user.avatarUrl ? (
                       <AvatarImage src={user.avatarUrl} alt={user.fullName} />
                     ) : null}
@@ -215,8 +215,8 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
                 </div>
               </div>
             </header>
-            <main className="flex-1 px-4 py-6 md:px-8 md:py-10">
-              <div className="mx-auto max-w-6xl">{children}</div>
+            <main className="flex-1 px-4 py-6 md:px-8 md:py-10 bg-background/60">
+              <div className="mx-auto max-w-6xl space-y-6">{children}</div>
             </main>
           </div>
         </div>

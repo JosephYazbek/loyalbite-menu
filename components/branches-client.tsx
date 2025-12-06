@@ -6,6 +6,7 @@ import {
   OpeningHours,
   ensureOpeningHours,
 } from "@/components/branch-hours-editor";
+import { BranchQrModal } from "@/components/branch-qr-modal";
 import { Button } from "@/components/ui/button";
 import { getPublicMenuUrl } from "@/lib/public-menu";
 import { slugify } from "@/lib/slug";
@@ -28,6 +29,7 @@ type RestaurantRecord = {
   id: string;
   name: string;
   slug: string;
+  primary_color: string | null;
   logo_url: string | null;
 };
 
@@ -57,7 +59,7 @@ const EMPTY_FORM: FormState = {
   phone: "",
   whatsapp: "",
   is_active: true,
-  opening_hours: ensureOpeningHours(null),  // ✅ FIXED
+  opening_hours: ensureOpeningHours(null),
 };
 
 
@@ -67,11 +69,17 @@ export function BranchesClient() {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [copiedBranchId, setCopiedBranchId] = useState<string | null>(null);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrBranch, setQrBranch] = useState<BranchRecord | null>(null);
 
   const [formMode, setFormMode] = useState<FormMode>("create");
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [formState, setFormState] = useState<FormState>(EMPTY_FORM);
   const [apiState, setApiState] = useState<ApiState>({ status: "idle" });
+  const qrPublicUrl =
+    qrBranch && restaurant
+      ? getPublicMenuUrl(restaurant.slug, qrBranch.slug)
+      : null;
 
   // Load branches
   useEffect(() => {
@@ -245,6 +253,16 @@ export function BranchesClient() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const handleOpenQrModal = (branch: BranchRecord) => {
+    setQrBranch(branch);
+    setQrModalOpen(true);
+  };
+
+  const handleCloseQrModal = () => {
+    setQrModalOpen(false);
+    setQrBranch(null);
+  };
+
   // UI ----------------------
 
   if (loading) return <p>Loading branches...</p>;
@@ -252,37 +270,58 @@ export function BranchesClient() {
 
   return (
     <div className="space-y-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-lg font-semibold">Branches</h1>
-                <p className="text-sm text-gray-600">
-                  Manage your branch locations and opening hours.
-                </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Operations
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Branches
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage locations, menu URLs, and contact details before sharing with
+            guests.
+          </p>
         </div>
 
-        <Button onClick={openCreateForm}>+ Add Branch</Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <Button onClick={openCreateForm} size="lg" className="h-10 px-6">
+            + Add Branch
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+        Branch slugs power the public menu at{" "}
+        <span className="font-mono text-foreground">
+          /m/&lt;restaurant&gt;/&lt;branch&gt;
+        </span>
+        . Keep them unique before sharing preview links or QR codes.
       </div>
 
       {branches.length === 0 ? (
-        <div className="p-6 border rounded-md text-gray-500 text-sm">
-          No branches yet.
+        <div className="rounded-2xl border border-dashed border-border/70 bg-card/80 p-8 text-center text-sm text-muted-foreground shadow-sm">
+          No branches yet. Add your first location to unlock menu previews and
+          QR generation.
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           {branches.map((branch) => (
             <div
               key={branch.id}
-              className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-medium">{branch.name}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-base font-semibold text-foreground">
+                    {branch.name}
+                  </p>
+                  <p className="mt-1 text-xs font-mono text-muted-foreground">
                     /m/{restaurant?.slug}/{branch.slug}
                   </p>
                 </div>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${
+                  className={`rounded-full px-3 py-0.5 text-xs font-medium ${
                     branch.is_active
                       ? "bg-green-100 text-green-700"
                       : "bg-slate-200 text-slate-600"
@@ -293,13 +332,28 @@ export function BranchesClient() {
               </div>
 
               {branch.address && (
-                <p className="text-sm text-slate-600">{branch.address}</p>
+                <p className="text-sm text-muted-foreground">
+                  {branch.address}
+                </p>
               )}
 
               {restaurant?.slug ? (
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button
-                    variant="secondary"
+                    variant="outline"
+                    className="text-sm"
+                    disabled={!branch.slug}
+                    title={
+                      branch.slug
+                        ? undefined
+                        : "Set a slug for this branch to enable QR codes."
+                    }
+                    onClick={() => handleOpenQrModal(branch)}
+                  >
+                    QR Code
+                  </Button>
+                  <Button
+                    variant="outline"
                     className="text-sm"
                     disabled={!restaurant.slug}
                     onClick={() =>
@@ -328,19 +382,21 @@ export function BranchesClient() {
                 </div>
               ) : null}
 
-              <div className="flex justify-between text-xs text-slate-500">
-                <button
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => openEditForm(branch)}
-                  className="font-medium text-blue-600 hover:underline"
                 >
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
                   onClick={() => handleDelete(branch)}
-                  className="font-medium text-red-600 hover:underline"
                 >
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -440,16 +496,27 @@ export function BranchesClient() {
               <Button type="submit" disabled={apiState.status === "loading"}>
                 {formMode === "create"
                   ? apiState.status === "loading"
-                    ? "Creating…"
+                    ? "Creating..."
                     : "Create Branch"
                   : apiState.status === "loading"
-                    ? "Saving…"
+                    ? "Saving..."
                     : "Save Changes"}
               </Button>
             </form>
           </div>
         </div>
       )}
+
+      <BranchQrModal
+        open={Boolean(qrModalOpen && qrBranch && restaurant)}
+        onClose={handleCloseQrModal}
+        restaurantName={restaurant?.name ?? ""}
+        restaurantSlug={restaurant?.slug ?? ""}
+        restaurantPrimaryColor={restaurant?.primary_color ?? null}
+        branchName={qrBranch?.name ?? ""}
+        branchSlug={qrBranch?.slug ?? ""}
+        publicUrl={qrPublicUrl}
+      />
     </div>
   );
 }

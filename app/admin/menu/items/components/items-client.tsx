@@ -394,12 +394,18 @@ export default function ItemsClient({
       : undefined;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Menu Items</h2>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Menu
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Menu Items
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Manage your menu items, prices, tags, and availability.
+            Manage names, pricing, tags, and branch previews from a single
+            place.
           </p>
         </div>
 
@@ -409,7 +415,7 @@ export default function ItemsClient({
               Branch
             </span>
             <select
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
               value={selectedBranchId}
               onChange={(event) => setSelectedBranchId(event.target.value)}
             >
@@ -446,198 +452,203 @@ export default function ItemsClient({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border bg-gray-200 px-4 py-2 text-sm text-black">
-        <span>Drag items within their category to control display order.</span>
-        {reordering && (
-          <span className="inline-flex items-center gap-1 text-primary">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Saving order...
-          </span>
-        )}
+      <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span>Drag items within their category to control display order.</span>
+          {reordering && (
+            <span className="inline-flex items-center gap-1 text-primary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving order...
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Simple table view for now */}
-     <div className="rounded-xl bg-white border shadow-sm overflow-hidden">
-  <table className="w-full text-sm">
-    <thead className="bg-gray-50 text-gray-600 border-b">
-      <tr>
-        <th className="w-12 px-4 py-3"></th>
-        <th className="px-6 py-3 text-left font-semibold">Item</th>
-        <th className="px-6 py-3 text-left font-semibold">Category</th>
-        <th className="px-6 py-3 text-left font-semibold">Price</th>
-        <th className="px-6 py-3 text-left font-semibold">Tags</th>
-        <th className="px-6 py-3 text-left font-semibold">Status</th>
-        <th className="px-6 py-3 text-right font-semibold">Actions</th>
-      </tr>
-    </thead>
+      <div className="rounded-2xl border border-border bg-card shadow-sm ring-1 ring-black/5 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border bg-muted/60 text-muted-foreground">
+            <tr>
+              <th className="w-12 px-4 py-3" />
+              <th className="px-6 py-3 text-left font-semibold">Item</th>
+              <th className="px-6 py-3 text-left font-semibold">Category</th>
+              <th className="px-6 py-3 text-left font-semibold">Price</th>
+              <th className="px-6 py-3 text-left font-semibold">Tags</th>
+              <th className="px-6 py-3 text-left font-semibold">Status</th>
+              <th className="px-6 py-3 text-right font-semibold">Actions</th>
+            </tr>
+          </thead>
 
-    <tbody className="divide-y">
-      {items.map((item) => {
-        const category = categories.find((c) => c.id === item.category_id);
-        const isDragging = draggingItemId === item.id;
+          <tbody className="divide-y">
+            {items.map((item) => {
+              const category = categories.find(
+                (c) => c.id === item.category_id
+              );
+              const isDragging = draggingItemId === item.id;
 
-        return (
-          <tr
-            key={item.id}
-            draggable={canInteract}
-            onDragStart={(event) => handleDragStart(event, item.id)}
-            onDragOver={handleDragOver}
-            onDrop={(event) => handleDrop(event, item.id)}
-            onDragEnd={handleDragEnd}
-            className={cn(
-              "hover:bg-gray-50 transition",
-              isDragging && "bg-primary/5 opacity-70"
-            )}
-          >
-            <td className="px-4 py-4 align-middle">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-white text-muted-foreground transition">
-                <GripVertical className="h-4 w-4" />
-              </div>
-            </td>
-
-            {/* ITEM WITH IMAGE */}
-            <td className="px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="relative h-12 w-12 overflow-hidden rounded-md bg-gray-100">
-                  {item.image_url ? (
-                    <Image
-                      src={item.image_url}
-                      alt={item.name_en}
-                      fill
-                      className="object-cover"
-                      sizes="48px"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-                      No Img
+              return (
+                <tr
+                  key={item.id}
+                  draggable={canInteract}
+                  onDragStart={(event) => handleDragStart(event, item.id)}
+                  onDragOver={handleDragOver}
+                  onDrop={(event) => handleDrop(event, item.id)}
+                  onDragEnd={handleDragEnd}
+                  className={cn(
+                    "transition hover:bg-gray-50",
+                    isDragging && "bg-primary/5 opacity-70"
+                  )}
+                >
+                  <td className="px-4 py-4 align-middle">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-white text-muted-foreground transition">
+                      <GripVertical className="h-4 w-4" />
                     </div>
-                  )}
-                </div>
+                  </td>
 
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {item.name_en}
-                  </div>
-                  {item.name_ar && (
-                    <div className="text-xs text-gray-500">{item.name_ar}</div>
-                  )}
-                </div>
-              </div>
-            </td>
+                  {/* ITEM WITH IMAGE */}
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-12 w-12 overflow-hidden rounded-md bg-gray-100">
+                        {item.image_url ? (
+                          <Image
+                            src={item.image_url}
+                            alt={item.name_en}
+                            fill
+                            className="object-cover"
+                            sizes="48px"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground/70">
+                            No Img
+                          </div>
+                        )}
+                      </div>
 
-            {/* CATEGORY */}
-            <td className="px-6 py-4 text-gray-700">
-              {category ? category.name_en : "-"}
-            </td>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {item.name_en}
+                        </div>
+                        {item.name_ar && (
+                          <div className="text-xs text-gray-500">
+                            {item.name_ar}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
 
-            {/* PRICE */}
-            <td className="px-6 py-4 text-gray-700 whitespace-nowrap">
-              {item.price != null ? (
-                <>
-                  {item.price}{" "}
-                  <span className="text-xs text-gray-500">
-                    {item.primary_currency || ""}
-                  </span>
-                </>
-              ) : (
-                "-"
-              )}
+                  {/* CATEGORY */}
+                  <td className="px-6 py-4 text-foreground/80">
+                    {category ? category.name_en : "-"}
+                  </td>
 
-              {item.secondary_price != null && (
-                <div className="text-xs text-gray-500">
-                  {item.secondary_price} {item.secondary_currency || ""}
-                </div>
-              )}
-            </td>
+                  {/* PRICE */}
+                  <td className="whitespace-nowrap px-6 py-4 text-foreground/80">
+                    {item.price != null ? (
+                      <>
+                        {item.price}{" "}
+                        <span className="text-xs text-gray-500">
+                          {item.primary_currency || ""}
+                        </span>
+                      </>
+                    ) : (
+                      "-"
+                    )}
 
-            {/* TAGS */}
-            <td className="px-6 py-4">
-              <div className="flex flex-wrap gap-2">
-                {item.is_new && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                    New
-                  </span>
-                )}
-                {item.is_popular && (
-                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
-                    Popular
-                  </span>
-                )}
-                {item.is_spicy && (
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
-                    Spicy
-                  </span>
-                )}
-                {item.is_vegetarian && (
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                    Veg
-                  </span>
-                )}
-                {item.is_vegan && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                    Vegan
-                  </span>
-                )}
-              </div>
-            </td>
+                    {item.secondary_price != null && (
+                      <div className="text-xs text-gray-500">
+                        {item.secondary_price} {item.secondary_currency || ""}
+                      </div>
+                    )}
+                  </td>
 
-            {/* STATUS */}
-            <td className="px-6 py-4">
-              <div className="flex flex-col gap-1">
-                <span className="w-fit rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
-                  {item.is_visible ? "Visible" : "Hidden"}
-                </span>
-                <span className="w-fit rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
-                  {item.is_available ? "Available" : "Sold Out"}
-                </span>
-              </div>
-            </td>
+                  {/* TAGS */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {item.is_new && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                          New
+                        </span>
+                      )}
+                      {item.is_popular && (
+                        <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+                          Popular
+                        </span>
+                      )}
+                      {item.is_spicy && (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
+                          Spicy
+                        </span>
+                      )}
+                      {item.is_vegetarian && (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
+                          Veg
+                        </span>
+                      )}
+                      {item.is_vegan && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                          Vegan
+                        </span>
+                      )}
+                    </div>
+                  </td>
 
-            {/* ACTIONS */}
-            <td className="px-6 py-4 text-right">
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => handleEditClick(item)}
-                  className="rounded-md border border-gray-300 px-2 py-1 text-sm transition hover:bg-gray-100"
-                  disabled={!canInteract}
-                >
-                  Edit
-                </button>
+                  {/* STATUS */}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="w-fit rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                        {item.is_visible ? "Visible" : "Hidden"}
+                      </span>
+                      <span className="w-fit rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
+                        {item.is_available ? "Available" : "Sold Out"}
+                      </span>
+                    </div>
+                  </td>
 
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 transition hover:bg-red-200 disabled:opacity-50"
-                  disabled={!canInteract}
-                >
-                  Delete
-                </button>
-              </div>
-            </td>
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-</div>
+                  {/* ACTIONS */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditClick(item)}
+                        disabled={!canInteract}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={!canInteract}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-
-<ItemModal
-  key={mode === "edit" ? editingItem?.id : `create-${modalOpen}`}
-  open={modalOpen}
-  mode={mode}
-  categories={categories}
-  initialValues={modalInitialValues}
-  loading={saving}
-  uploadingImage={uploadingImage}
-  onClose={() => {
-    if (!saving && !uploadingImage) {
-      setModalOpen(false);
-      setEditingItem(null);
-    }
-  }}
-  onSubmit={handleSubmit}
-/>
-
+      <ItemModal
+        key={mode === "edit" ? editingItem?.id : `create-${modalOpen}`}
+        open={modalOpen}
+        mode={mode}
+        categories={categories}
+        initialValues={modalInitialValues}
+        loading={saving}
+        uploadingImage={uploadingImage}
+        onClose={() => {
+          if (!saving && !uploadingImage) {
+            setModalOpen(false);
+            setEditingItem(null);
+          }
+        }}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

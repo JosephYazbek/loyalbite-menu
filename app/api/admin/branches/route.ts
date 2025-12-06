@@ -8,6 +8,7 @@ type RestaurantRecord = {
   name: string;
   slug: string;
   logo_url: string | null;
+  primary_color: string | null;
 };
 
 type BranchDBRecord = {
@@ -56,7 +57,7 @@ export async function GET() {
   // 2) Get restaurant info
   const { data: restaurant } = await supabase
     .from("restaurants")
-    .select("id, name, slug, logo_url")
+    .select("id, name, slug, logo_url, primary_color")
     .eq("id", restaurantId)
     .single<RestaurantRecord>();
 

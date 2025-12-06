@@ -247,7 +247,10 @@ export function CategoriesClient({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Menu Categories</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Menu
+          </p>
+          <h1 className="text-2xl font-semibold text-foreground">Menu Categories</h1>
           <p className="text-sm text-muted-foreground">
             Manage the categories for <strong>{restaurantName}</strong>.
           </p>
@@ -263,25 +266,25 @@ export function CategoriesClient({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border bg-gray-200 px-4 py-2 text-sm text-black">
+      <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
         <span>Drag categories with the handle to control how they appear.</span>
         {reordering && (
-          <span className="inline-flex items-center gap-1 text-primary">
+          <span className="inline-flex items-center gap-1 text-primary pl-2">
             <Loader2 className="h-4 w-4 animate-spin" />
             Saving order...
           </span>
         )}
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm">
-        <table className="w-full">
-          <thead className="border-b bg-gray-50">
+      <div className="rounded-3xl border border-border bg-card shadow-sm ring-1 ring-black/5 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border/80 bg-secondary text-muted-foreground">
             <tr>
               <th className="w-12 px-4 py-3 text-left" />
-              <th className="px-4 py-3 text-left">Category</th>
-              <th className="px-4 py-3 text-left">Description</th>
-              <th className="px-4 py-3 text-left">Flags</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3 text-left font-semibold">Category</th>
+              <th className="px-4 py-3 text-left font-semibold">Description</th>
+              <th className="px-4 py-3 text-left font-semibold">Flags</th>
+              <th className="px-4 py-3 text-right font-semibold">Actions</th>
             </tr>
           </thead>
 
@@ -305,12 +308,12 @@ export function CategoriesClient({
                   onDrop={(event) => handleDrop(event, cat.id)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "border-t hover:bg-gray-50",
-                    isDragging && "bg-primary/5 opacity-70"
+                    "border-t border-border/60 bg-card hover:bg-secondary/40",
+                    isDragging && "bg-primary/5"
                   )}
                 >
                   <td className="px-4 py-3 align-middle">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-white text-muted-foreground transition">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition">
                       <GripVertical className="h-4 w-4" />
                     </div>
                   </td>
@@ -325,12 +328,14 @@ export function CategoriesClient({
                           className="h-10 w-10 rounded border object-cover"
                         />
                       ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded border text-xs text-muted-foreground">
+                        <div className="flex h-10 w-10 items-center justify-center rounded border border-border text-xs text-muted-foreground">
                           <ImageIcon className="h-4 w-4" />
                         </div>
                       )}
                       <div>
-                        <div className="font-medium">{cat.name_en}</div>
+                        <div className="font-medium text-foreground">
+                          {cat.name_en}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           Order #{cat.display_order}
                         </div>
