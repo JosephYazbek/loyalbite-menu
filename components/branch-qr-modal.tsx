@@ -5,16 +5,20 @@ import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import {
+  getPublicMenuUrl,
+  getPublicMicrositeUrl,
+} from "@/lib/public-menu";
 
 type BranchQrModalProps = {
   open: boolean;
   onClose: () => void;
   restaurantName: string;
   restaurantSlug: string;
+  restaurantDefaultLanguage: "en" | "ar" | "both" | null;
   restaurantPrimaryColor?: string | null;
   branchName: string;
   branchSlug: string;
-  publicUrl: string | null;
 };
 
 const SIZE_PRESETS = [
@@ -32,15 +36,16 @@ export function BranchQrModal({
   onClose,
   restaurantName,
   restaurantSlug,
+  restaurantDefaultLanguage,
   restaurantPrimaryColor,
   branchName,
   branchSlug,
-  publicUrl,
 }: BranchQrModalProps) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sizePreset, setSizePreset] =
     useState<(typeof SIZE_PRESETS)[number]>(SIZE_PRESETS[1]);
   const [useBrandColor, setUseBrandColor] = useState<boolean>(false);
+  const [destination, setDestination] = useState<"menu" | "microsite">("menu");
   const [copied, setCopied] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -48,6 +53,7 @@ export function BranchQrModal({
     if (!open) return;
     setTheme("light");
     setSizePreset(SIZE_PRESETS[1]);
+    setDestination("menu");
     setUseBrandColor(Boolean(restaurantPrimaryColor));
     setCopied(false);
   }, [open, restaurantPrimaryColor]);
@@ -66,18 +72,28 @@ export function BranchQrModal({
   }, [theme, useBrandColor, restaurantPrimaryColor]);
 
   const backgroundColor = theme === "dark" ? "#0f172a" : "#ffffff";
+  const resolvedLanguage =
+    restaurantDefaultLanguage === "ar" ? "ar" : "en";
+  const branchUrl = restaurantSlug && branchSlug
+    ? getPublicMenuUrl(restaurantSlug, branchSlug, resolvedLanguage)
+    : null;
+  const micrositeUrl = restaurantSlug
+    ? getPublicMicrositeUrl(restaurantSlug, resolvedLanguage)
+    : null;
+  const shareUrl =
+    destination === "microsite" ? micrositeUrl ?? branchUrl : branchUrl ?? micrositeUrl;
 
   const handleCopyLink = async () => {
-    if (!publicUrl) return;
+    if (!shareUrl) return;
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(publicUrl);
+        await navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         return;
       }
 
       const textarea = document.createElement("textarea");
-      textarea.value = publicUrl;
+      textarea.value = shareUrl;
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand("copy");
@@ -90,7 +106,7 @@ export function BranchQrModal({
   };
 
   const handleDownload = () => {
-    if (!publicUrl) return;
+    if (!shareUrl) return;
     const canvas = qrCanvasRef.current;
     if (!canvas) {
       alert("QR preview is not ready yet.");
@@ -98,7 +114,10 @@ export function BranchQrModal({
     }
 
     const dataUrl = canvas.toDataURL("image/png");
-    const filename = `${restaurantSlug || "restaurant"}-${branchSlug || "branch"}-menu-qr.png`;
+    const filename =
+      destination === "microsite"
+        ? `${restaurantSlug || "restaurant"}-site-qr.png`
+        : `${restaurantSlug || "restaurant"}-${branchSlug || "branch"}-menu-qr.png`;
     const link = document.createElement("a");
     link.href = dataUrl;
     link.download = filename;
@@ -141,19 +160,47 @@ export function BranchQrModal({
 
             <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex-1 truncate text-sm text-slate-700">
-                {publicUrl ?? "URL unavailable"}
+                {shareUrl ?? "URL unavailable"}
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleCopyLink}
-                disabled={!publicUrl}
+                disabled={!shareUrl}
               >
                 {copied ? "Copied" : "Copy link"}
               </Button>
             </div>
 
             <div className="mt-6 space-y-6 rounded-3xl border border-border bg-card/60 p-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+                  Destination
+                </p>
+                <div className="mt-3 flex gap-2">
+                  {[
+                    { id: "menu", label: "Branch menu" },
+                    { id: "microsite", label: "Restaurant site" },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() =>
+                        setDestination(option.id as "menu" | "microsite")
+                      }
+                      className={cn(
+                        "flex-1 rounded-2xl border px-3 py-2 text-sm transition",
+                        destination === option.id
+                          ? "border-amber-600 bg-amber-500/10 text-amber-700"
+                          : "border-slate-200 text-slate-500 hover:border-slate-400"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
                   Theme
@@ -225,7 +272,7 @@ export function BranchQrModal({
               <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={handleDownload}
-                  disabled={!publicUrl}
+                  disabled={!shareUrl}
                   className="flex-1"
                 >
                   Download PNG
@@ -246,7 +293,7 @@ export function BranchQrModal({
             >
               <QRCodeCanvas
                 ref={qrCanvasRef}
-                value={publicUrl ?? "https://loyalbite.menu"}
+                value={shareUrl ?? "https://loyalbite.menu"}
                 size={sizePreset.dimension}
                 includeMargin
                 marginSize={sizePreset.margin}

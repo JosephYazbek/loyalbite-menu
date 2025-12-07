@@ -15,10 +15,25 @@ const resolveBaseUrl = () => {
   return FALLBACK_BASE_URL;
 };
 
+export const getPublicBaseUrl = () => resolveBaseUrl();
+
 export function getPublicMenuUrl(
   restaurantSlug: string,
-  branchSlug: string
+  branchSlug: string,
+  language?: "en" | "ar"
 ): string {
   const baseUrl = resolveBaseUrl();
-  return `${baseUrl}/m/${restaurantSlug}/${branchSlug}`;
+  const encoded = `${baseUrl}/m/${restaurantSlug}/${branchSlug}`;
+  if (!language) return encoded;
+  return `${encoded}?lang=${language}`;
+}
+
+export function getPublicMicrositeUrl(
+  restaurantSlug: string,
+  language?: "en" | "ar"
+): string {
+  const baseUrl = resolveBaseUrl();
+  const encoded = `${baseUrl}/r/${restaurantSlug}`;
+  if (!language) return encoded;
+  return `${encoded}?lang=${language}`;
 }

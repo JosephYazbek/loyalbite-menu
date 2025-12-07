@@ -2,10 +2,16 @@
 
 export type AnalyticsEventPayload = {
   restaurantId: string;
-  branchId: string;
+  branchId?: string;
   categoryId?: string;
   itemId?: string;
-  eventType: "menu_view" | "category_view" | "item_view" | "whatsapp_click";
+  eventType:
+    | "menu_view"
+    | "category_view"
+    | "item_view"
+    | "whatsapp_click"
+    | "microsite_view"
+    | "microsite_to_menu_click";
   language?: "en" | "ar";
 };
 
@@ -40,6 +46,9 @@ export async function logAnalyticsEvent(
   if (typeof window === "undefined") return;
 
   try {
+    if (!payload.branchId) {
+      return;
+    }
     const sessionId = getSessionId();
     const deviceType = getDeviceType();
 

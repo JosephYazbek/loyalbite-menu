@@ -5,8 +5,10 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { logAnalyticsEvent } from "@/lib/analytics-client";
 import { cn } from "@/lib/utils";
+import { SupportedLanguage } from "@/lib/language";
+import { WhatsAppLogo } from "@/components/whatsapp-logo";
 
-type MenuLanguage = "en" | "ar";
+type MenuLanguage = SupportedLanguage;
 
 type ItemRecord = {
   id: string;
@@ -399,10 +401,11 @@ export function MenuClient({
               <button
                 type="button"
                 onClick={handleWhatsAppClick}
-                className="w-full rounded-full px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 sm:w-auto"
-                style={{ backgroundColor: resolvedAccent }}
+                className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                aria-label={labels.whatsappCta}
               >
-                {labels.whatsappCta}
+                <WhatsAppLogo className="h-14 w-14" />
+                <span className="sr-only">{labels.whatsappCta}</span>
               </button>
             ) : null}
           </div>

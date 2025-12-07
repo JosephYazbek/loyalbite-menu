@@ -71,12 +71,13 @@ export default async function ItemsPage() {
 
   let restaurantSlug: string | null = null;
   let branches: BranchRecord[] = [];
+  let restaurantDefaultLanguage: "en" | "ar" | "both" | null = "en";
 
   if (inferredRestaurantId) {
     const [{ data: restaurantRecord }, { data: branchData }] = await Promise.all([
       supabase
         .from("restaurants")
-        .select("slug")
+        .select("slug, default_language")
         .eq("id", inferredRestaurantId)
         .maybeSingle(),
       supabase
@@ -87,6 +88,8 @@ export default async function ItemsPage() {
     ]);
 
     restaurantSlug = restaurantRecord?.slug ?? null;
+    restaurantDefaultLanguage =
+      (restaurantRecord?.default_language as "en" | "ar" | "both" | null) ?? "en";
 
     const normalizedBranchRows = await normalizeBranchSlugs(
       supabase,
@@ -112,6 +115,7 @@ export default async function ItemsPage() {
         items={items}
         branches={branches}
         restaurantSlug={restaurantSlug}
+        restaurantDefaultLanguage={restaurantDefaultLanguage}
       />
     </div>
   );

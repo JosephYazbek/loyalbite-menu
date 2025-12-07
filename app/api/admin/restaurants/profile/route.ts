@@ -7,12 +7,16 @@ const LANGUAGE_VALUES = new Set(["en", "ar", "both"]);
 const HEX_PATTERN = /^#([\da-f]{3}|[\da-f]{6})$/i;
 
 type RestaurantUpdate = {
+  description?: string | null;
   description_en?: string | null;
   description_ar?: string | null;
   phone?: string | null;
   whatsapp_phone?: string | null;
   email?: string | null;
   website?: string | null;
+  contact_phone?: string | null;
+  contact_whatsapp?: string | null;
+  contact_email?: string | null;
   primary_color?: string | null;
   default_language?: "en" | "ar" | "both";
   logo_url?: string | null;
@@ -80,6 +84,18 @@ export async function POST(request: Request) {
       updates.website = normalizeText(body.website);
     }
 
+    if ("contact_phone" in body) {
+      updates.contact_phone = normalizeText(body.contact_phone);
+    }
+
+    if ("contact_whatsapp" in body) {
+      updates.contact_whatsapp = normalizeText(body.contact_whatsapp);
+    }
+
+    if ("contact_email" in body) {
+      updates.contact_email = normalizeText(body.contact_email);
+    }
+
     if ("primary_color" in body) {
       const proposed = normalizeText(body.primary_color);
       updates.primary_color =
@@ -104,6 +120,14 @@ export async function POST(request: Request) {
       updates.cover_image_url = normalizeText(body.cover_image_url);
     }
 
+    if ("profile_meta" in body) {
+      const meta =
+        typeof body.profile_meta === "string" && body.profile_meta.trim().length > 0
+          ? body.profile_meta
+          : null;
+      updates.description = meta;
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
         { error: "No valid fields provided" },
@@ -122,6 +146,7 @@ export async function POST(request: Request) {
         id,
         name,
         slug,
+        description,
         description_en,
         description_ar,
         phone,

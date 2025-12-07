@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   uploadRestaurantAsset,
@@ -10,6 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  parseRestaurantProfileMeta,
+  serializeRestaurantProfileMeta,
+} from "@/lib/restaurant-profile";
+import { getPublicMicrositeUrl } from "@/lib/public-menu";
 
 type RestaurantProfile = {
   id: string;
@@ -17,6 +22,7 @@ type RestaurantProfile = {
   slug: string;
   descriptionEn: string | null;
   descriptionAr: string | null;
+  profileMeta: string | null;
   phone: string | null;
   whatsappPhone: string | null;
   email: string | null;
@@ -31,6 +37,44 @@ type ProfileFormProps = {
   restaurant: RestaurantProfile;
 };
 
+const COUNTRY_OPTIONS = [
+  { value: "+961", label: "Lebanon (+961)" },
+  { value: "+971", label: "UAE (+971)" },
+  { value: "+966", label: "Saudi (+966)" },
+  { value: "+965", label: "Kuwait (+965)" },
+  { value: "+974", label: "Qatar (+974)" },
+  { value: "+962", label: "Jordan (+962)" },
+  { value: "+90", label: "Turkey (+90)" },
+  { value: "+1", label: "USA / Canada (+1)" },
+];
+
+const sanitizeDigits = (value: string) => value.replace(/[^\d]/g, "");
+
+const splitInternationalNumber = (raw: string | null, fallback: string) => {
+  if (!raw) return { code: fallback, number: "" };
+  const trimmed = raw.trim();
+  const intlMatch = trimmed.match(/^(\+\d{1,4})\s*(.*)$/);
+  if (intlMatch) {
+    return {
+      code: intlMatch[1],
+      number: sanitizeDigits(intlMatch[2]),
+    };
+  }
+  return {
+    code: fallback,
+    number: sanitizeDigits(trimmed),
+  };
+};
+
+const formatInternationalNumber = (code: string, digits: string) => {
+  const normalized = sanitizeDigits(digits);
+  if (!normalized) return null;
+  if (!code.startsWith("+")) {
+    return `+${code}${normalized}`;
+  }
+  return `${code}${normalized}`;
+};
+
 const LANGUAGE_OPTIONS: Array<{ value: "en" | "ar" | "both"; label: string }> =
   [
     { value: "en", label: "English first" },
@@ -39,11 +83,19 @@ const LANGUAGE_OPTIONS: Array<{ value: "en" | "ar" | "both"; label: string }> =
   ];
 
 export function ProfileForm({ restaurant }: ProfileFormProps) {
+  const profileMeta = parseRestaurantProfileMeta(restaurant.profileMeta);
+  const phoneSplit = splitInternationalNumber(
+    restaurant.phone,
+    profileMeta.phoneCountryCode ?? "+961"
+  );
+  const whatsappSplit = splitInternationalNumber(
+    restaurant.whatsappPhone,
+    profileMeta.whatsappCountryCode ?? profileMeta.phoneCountryCode ?? "+961"
+  );
+
   const [formState, setFormState] = useState({
     descriptionEn: restaurant.descriptionEn ?? "",
     descriptionAr: restaurant.descriptionAr ?? "",
-    phone: restaurant.phone ?? "",
-    whatsappPhone: restaurant.whatsappPhone ?? "",
     email: restaurant.email ?? "",
     website: restaurant.website ?? "",
     primaryColor: restaurant.primaryColor ?? "#0F172B",
@@ -51,14 +103,41 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
     logoUrl: restaurant.logoUrl,
     coverImageUrl: restaurant.coverImageUrl,
   });
+  const [phoneCountryCode, setPhoneCountryCode] = useState(
+    phoneSplit.code || "+961"
+  );
+  const [phoneDigits, setPhoneDigits] = useState(phoneSplit.number);
+  const [whatsappCountryCode, setWhatsappCountryCode] = useState(
+    whatsappSplit.code || phoneSplit.code || "+961"
+  );
+  const [whatsappDigits, setWhatsappDigits] = useState(whatsappSplit.number);
+  const [socialLinks, setSocialLinks] = useState({
+    instagram: profileMeta.socials?.instagram ?? "",
+    facebook: profileMeta.socials?.facebook ?? "",
+    tiktok: profileMeta.socials?.tiktok ?? "",
+    twitter: profileMeta.socials?.twitter ?? "",
+    youtube: profileMeta.socials?.youtube ?? "",
+  });
+  const resolvedMicrositeLanguage =
+    formState.defaultLanguage === "ar" ? "ar" : "en";
+  const micrositeUrl = getPublicMicrositeUrl(
+    restaurant.slug,
+    resolvedMicrositeLanguage
+  );
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedMicrosite, setCopiedMicrosite] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!copiedMicrosite) return;
+    const timer = setTimeout(() => setCopiedMicrosite(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copiedMicrosite]);
 
   const handleChange =
     (field: keyof typeof formState) =>
@@ -66,6 +145,29 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
       const value = event.target.value;
       setFormState((prev) => ({ ...prev, [field]: value }));
     };
+  const handleSocialChange =
+    (field: keyof typeof socialLinks) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setSocialLinks((prev) => ({ ...prev, [field]: value }));
+    };
+  const handleCopyMicrosite = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(micrositeUrl);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = micrositeUrl;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+      setCopiedMicrosite(true);
+    } catch (error) {
+      console.error("Failed to copy microsite link", error);
+    }
+  };
 
   const uploadAsset = async (kind: "logo" | "cover", file: File) => {
     const setUploading = kind === "logo" ? setLogoUploading : setCoverUploading;
@@ -133,6 +235,21 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
     setError(null);
     setMessage(null);
 
+    const normalizedPhone = formatInternationalNumber(
+      phoneCountryCode,
+      phoneDigits
+    );
+    const normalizedWhatsapp = formatInternationalNumber(
+      whatsappCountryCode,
+      whatsappDigits
+    );
+
+    const serializedMeta = serializeRestaurantProfileMeta({
+      phoneCountryCode,
+      whatsappCountryCode,
+      socials: socialLinks,
+    });
+
     try {
       const response = await fetch("/api/admin/restaurants/profile", {
         method: "POST",
@@ -140,14 +257,18 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
         body: JSON.stringify({
           description_en: formState.descriptionEn,
           description_ar: formState.descriptionAr,
-          phone: formState.phone,
-          whatsapp_phone: formState.whatsappPhone,
+          phone: normalizedPhone ?? "",
+          whatsapp_phone: normalizedWhatsapp ?? "",
           email: formState.email,
           website: formState.website,
           primary_color: formState.primaryColor,
           default_language: formState.defaultLanguage,
           logo_url: formState.logoUrl,
           cover_image_url: formState.coverImageUrl,
+          contact_phone: normalizedPhone ?? "",
+          contact_whatsapp: normalizedWhatsapp ?? "",
+          contact_email: formState.email,
+          profile_meta: serializedMeta,
         }),
       });
 
@@ -236,23 +357,55 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              value={formState.phone}
-              onChange={handleChange("phone")}
-              placeholder="+1 555 0100"
-              disabled={saving}
-            />
+            <div className="flex gap-2">
+              <select
+                className="w-36 rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+                value={phoneCountryCode}
+                onChange={(event) => setPhoneCountryCode(event.target.value)}
+                disabled={saving}
+              >
+                {COUNTRY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Input
+                id="phone"
+                value={phoneDigits}
+                onChange={(event) =>
+                  setPhoneDigits(sanitizeDigits(event.target.value))
+                }
+                placeholder="813 555 010"
+                disabled={saving}
+              />
+            </div>
           </div>
           <div>
             <Label htmlFor="whatsapp">WhatsApp number</Label>
-            <Input
-              id="whatsapp"
-              value={formState.whatsappPhone}
-              onChange={handleChange("whatsappPhone")}
-              placeholder="Use full international format"
-              disabled={saving}
-            />
+            <div className="flex gap-2">
+              <select
+                className="w-36 rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+                value={whatsappCountryCode}
+                onChange={(event) => setWhatsappCountryCode(event.target.value)}
+                disabled={saving}
+              >
+                {COUNTRY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Input
+                id="whatsapp"
+                value={whatsappDigits}
+                onChange={(event) =>
+                  setWhatsappDigits(sanitizeDigits(event.target.value))
+                }
+                placeholder="812 600 120"
+                disabled={saving}
+              />
+            </div>
           </div>
           <div>
             <Label htmlFor="email">Email</Label>
@@ -272,6 +425,59 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
               value={formState.website}
               onChange={handleChange("website")}
               placeholder="https://"
+              disabled={saving}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="instagram">Instagram</Label>
+            <Input
+              id="instagram"
+              value={socialLinks.instagram}
+              onChange={handleSocialChange("instagram")}
+              placeholder="https://instagram.com/loyalbite"
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="facebook">Facebook</Label>
+            <Input
+              id="facebook"
+              value={socialLinks.facebook}
+              onChange={handleSocialChange("facebook")}
+              placeholder="https://facebook.com/loyalbite"
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="tiktok">TikTok</Label>
+            <Input
+              id="tiktok"
+              value={socialLinks.tiktok}
+              onChange={handleSocialChange("tiktok")}
+              placeholder="https://tiktok.com/@loyalbite"
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="twitter">Twitter / X</Label>
+            <Input
+              id="twitter"
+              value={socialLinks.twitter}
+              onChange={handleSocialChange("twitter")}
+              placeholder="https://x.com/loyalbite"
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="youtube">YouTube</Label>
+            <Input
+              id="youtube"
+              value={socialLinks.youtube}
+              onChange={handleSocialChange("youtube")}
+              placeholder="https://youtube.com/@loyalbite"
               disabled={saving}
             />
           </div>
@@ -362,6 +568,42 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
           className="hidden"
           onChange={handleFileSelection("cover")}
         />
+      </section>
+
+      <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Public micro-site
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Share a branded landing page that highlights your branches,
+            contact info, and WhatsApp CTA.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-background px-4 py-3 sm:flex-row sm:items-center">
+          <div className="flex-1 truncate text-sm text-slate-800">
+            {micrositeUrl}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCopyMicrosite}
+            >
+              {copiedMicrosite ? "Copied" : "Copy URL"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                window.open(micrositeUrl, "_blank", "noopener,noreferrer")
+              }
+            >
+              Preview
+            </Button>
+          </div>
+        </div>
       </section>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

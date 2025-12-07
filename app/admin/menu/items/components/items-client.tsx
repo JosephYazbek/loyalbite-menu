@@ -22,6 +22,7 @@ type ItemsClientProps = {
     is_active: boolean;
   }>;
   restaurantSlug?: string | null;
+  restaurantDefaultLanguage?: "en" | "ar" | "both" | null;
 };
 
 export default function ItemsClient({
@@ -29,6 +30,7 @@ export default function ItemsClient({
   items: initialItems,
   branches = [],
   restaurantSlug,
+  restaurantDefaultLanguage = "en",
 }: ItemsClientProps) {
   const [items, setItems] = useState(initialItems);
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,7 +63,11 @@ export default function ItemsClient({
 
   const previewUrl =
     selectedBranch && restaurantSlug
-      ? getPublicMenuUrl(restaurantSlug, selectedBranch.slug)
+      ? getPublicMenuUrl(
+          restaurantSlug,
+          selectedBranch.slug,
+          restaurantDefaultLanguage === "ar" ? "ar" : "en"
+        )
       : null;
 
   const handleAddClick = () => {

@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
-const EVENT_TYPES = new Set(["menu_view", "category_view", "item_view", "whatsapp_click"]);
+const EVENT_TYPES = new Set([
+  "menu_view",
+  "category_view",
+  "item_view",
+  "whatsapp_click",
+  "microsite_view",
+  "microsite_to_menu_click",
+]);
 
 type LogEventBody = {
   restaurantId?: string;

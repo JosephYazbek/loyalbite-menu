@@ -31,6 +31,7 @@ type RestaurantRecord = {
   slug: string;
   primary_color: string | null;
   logo_url: string | null;
+  default_language: "en" | "ar" | "both" | null;
 };
 
 type ApiState =
@@ -76,10 +77,8 @@ export function BranchesClient() {
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [formState, setFormState] = useState<FormState>(EMPTY_FORM);
   const [apiState, setApiState] = useState<ApiState>({ status: "idle" });
-  const qrPublicUrl =
-    qrBranch && restaurant
-      ? getPublicMenuUrl(restaurant.slug, qrBranch.slug)
-      : null;
+  const defaultLangParam =
+    restaurant?.default_language === "ar" ? "ar" : "en";
 
   // Load branches
   useEffect(() => {
@@ -359,7 +358,11 @@ export function BranchesClient() {
                     onClick={() =>
                       handleCopyLink(
                         branch.id,
-                        getPublicMenuUrl(restaurant.slug, branch.slug)
+                        getPublicMenuUrl(
+                          restaurant.slug,
+                          branch.slug,
+                          defaultLangParam
+                        )
                       )
                     }
                   >
@@ -370,7 +373,11 @@ export function BranchesClient() {
                     className="text-sm"
                     onClick={() =>
                       handlePreview(
-                        getPublicMenuUrl(restaurant.slug, branch.slug)
+                        getPublicMenuUrl(
+                          restaurant.slug,
+                          branch.slug,
+                          defaultLangParam
+                        )
                       )
                     }
                   >
@@ -513,9 +520,9 @@ export function BranchesClient() {
         restaurantName={restaurant?.name ?? ""}
         restaurantSlug={restaurant?.slug ?? ""}
         restaurantPrimaryColor={restaurant?.primary_color ?? null}
+        restaurantDefaultLanguage={(restaurant?.default_language as "en" | "ar" | "both" | null) ?? "en"}
         branchName={qrBranch?.name ?? ""}
         branchSlug={qrBranch?.slug ?? ""}
-        publicUrl={qrPublicUrl}
       />
     </div>
   );

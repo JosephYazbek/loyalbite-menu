@@ -2,6 +2,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { MenuClient } from "./menu-client";
+import { determineInitialLanguage, resolveLanguageParam } from "@/lib/language";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,15 +45,6 @@ type ItemRecord = {
   is_vegan: boolean | null;
   is_gluten_free: boolean | null;
   display_order: number | null;
-};
-
-const resolveLanguageParam = (
-  value: string | string[] | undefined
-): "en" | "ar" | null => {
-  if (!value) return null;
-  const normalized = Array.isArray(value) ? value[0] : value;
-  if (normalized === "en" || normalized === "ar") return normalized;
-  return null;
 };
 
 export default async function BranchPublicMenuPage({
@@ -161,11 +153,10 @@ export default async function BranchPublicMenuPage({
   }
 
   const urlLanguage = resolveLanguageParam(query?.lang);
-  let initialLanguage: "en" | "ar" =
-    restaurant.default_language === "ar" ? "ar" : "en";
-  if (urlLanguage) {
-    initialLanguage = urlLanguage;
-  }
+  const initialLanguage = determineInitialLanguage(
+    restaurant.default_language,
+    urlLanguage
+  );
 
   const itemsByCategory = new Map<string, ItemRecord[]>();
   (itemsData ?? []).forEach((item) => {
