@@ -128,7 +128,7 @@ const updateDay = (day: keyof OpeningHours, patch: Partial<OpeningHoursDay>) => 
                 <div className="flex items-center gap-2">
                   <input
                     type="time"
-                    className="w-28 rounded-md border px-2 py-1 text-sm disabled:bg-gray-100"
+                    className="w-36 rounded-2xl border border-border bg-background px-4 pr-10 py-2 text-sm uppercase tracking-[0.15em] disabled:bg-gray-100"
                     value={day.open ?? ""}
                     onChange={(e) =>
                       updateDay(dayKey, { open: e.target.value || null })
@@ -138,7 +138,7 @@ const updateDay = (day: keyof OpeningHours, patch: Partial<OpeningHoursDay>) => 
                   <span className="text-xs text-gray-400">to</span>
                   <input
                     type="time"
-                    className="w-28 rounded-md border px-2 py-1 text-sm disabled:bg-gray-100"
+                    className="w-36 rounded-2xl border border-border bg-background px-4 pr-10 py-2 text-sm uppercase tracking-[0.15em] disabled:bg-gray-100"
                     value={day.close ?? ""}
                     onChange={(e) =>
                       updateDay(dayKey, { close: e.target.value || null })
