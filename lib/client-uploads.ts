@@ -115,3 +115,28 @@ export function removeItemImage(url: string) {
 export function removeCategoryImage(url: string) {
   return deleteImageViaApi({ bucket: "restaurant-assets", url });
 }
+
+type RestaurantAssetArgs = {
+  restaurantId: string;
+  kind: "logo" | "cover";
+  file: File;
+  existingUrl?: string | null;
+};
+
+export function uploadRestaurantAsset({
+  restaurantId,
+  kind,
+  file,
+  existingUrl,
+}: RestaurantAssetArgs) {
+  return uploadImageViaApi({
+    endpoint: "/api/admin/upload/restaurant-asset",
+    fields: { restaurantId, kind },
+    file,
+    existingUrl,
+  });
+}
+
+export function removeRestaurantAsset(url: string) {
+  return deleteImageViaApi({ bucket: "restaurant-assets", url });
+}

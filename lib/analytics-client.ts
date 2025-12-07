@@ -5,7 +5,7 @@ export type AnalyticsEventPayload = {
   branchId: string;
   categoryId?: string;
   itemId?: string;
-  eventType: "menu_view" | "category_view" | "item_view";
+  eventType: "menu_view" | "category_view" | "item_view" | "whatsapp_click";
   language?: "en" | "ar";
 };
 

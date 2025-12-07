@@ -180,6 +180,9 @@ export default async function AnalyticsPage({
     (event) => event.event_type === "menu_view"
   );
   const totalMenuViews = menuViews.length;
+  const whatsappClicks = analyticsEvents.filter(
+    (event) => event.event_type === "whatsapp_click"
+  ).length;
 
   const dailyMap = new Map<string, number>();
   menuViews.forEach((event) => {
@@ -340,11 +343,12 @@ export default async function AnalyticsPage({
         <RangeSelector value={rangeValue} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard title="Menu views" value={totalMenuViews} />
         <KpiCard title="Unique sessions" value={uniqueSessions} />
         <KpiCard title="Most used language" value={languageLabel} />
         <KpiCard title="Mobile traffic" value={`${mobilePercentage}%`} />
+        <KpiCard title="WhatsApp clicks" value={whatsappClicks} />
       </div>
 
       <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">

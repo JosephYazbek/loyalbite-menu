@@ -73,19 +73,18 @@ export default async function ItemsPage() {
   let branches: BranchRecord[] = [];
 
   if (inferredRestaurantId) {
-    const [{ data: restaurantRecord }, { data: branchData }] =
-      await Promise.all([
-        supabase
-          .from("restaurants")
-          .select("slug")
-          .eq("id", inferredRestaurantId)
-          .maybeSingle(),
-        supabase
-          .from("branches")
-          .select("id, name, slug, is_active")
-          .eq("restaurant_id", inferredRestaurantId)
-          .order("name", { ascending: true }),
-      ]);
+    const [{ data: restaurantRecord }, { data: branchData }] = await Promise.all([
+      supabase
+        .from("restaurants")
+        .select("slug")
+        .eq("id", inferredRestaurantId)
+        .maybeSingle(),
+      supabase
+        .from("branches")
+        .select("id, name, slug, is_active")
+        .eq("restaurant_id", inferredRestaurantId)
+        .order("name", { ascending: true }),
+    ]);
 
     restaurantSlug = restaurantRecord?.slug ?? null;
 
@@ -107,11 +106,13 @@ export default async function ItemsPage() {
   }
 
   return (
-    <ItemsClient
-      categories={categories}
-      items={items}
-      branches={branches}
-      restaurantSlug={restaurantSlug}
-    />
+    <div className="space-y-6">
+      <ItemsClient
+        categories={categories}
+        items={items}
+        branches={branches}
+        restaurantSlug={restaurantSlug}
+      />
+    </div>
   );
 }
