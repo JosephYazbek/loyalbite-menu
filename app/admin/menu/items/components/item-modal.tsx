@@ -286,14 +286,20 @@ export default function ItemModal({
   const modalDescription =
     mode === "create"
       ? "Create a new menu item under one of your categories."
-      : "Update this menu item’s details.";
+      : "Update this menu item's details.";
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !disableInteractions) {
+      onClose();
+    }
+  };
 
   return (
     <Dialog
       open={open}
-      onOpenChange={() => !disableInteractions && onClose()}
+      onOpenChange={handleOpenChange}
     >
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{modalTitle}</DialogTitle>
           <DialogDescription>{modalDescription}</DialogDescription>

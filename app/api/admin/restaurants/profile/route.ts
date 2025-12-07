@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createSupabaseServiceRoleClient } from "@/lib/supabaseService";
 
 const LANGUAGE_VALUES = new Set(["en", "ar", "both"]);
 
 const HEX_PATTERN = /^#([\da-f]{3}|[\da-f]{6})$/i;
+
+type RestaurantUpdate = {
+  description_en?: string | null;
+  description_ar?: string | null;
+  phone?: string | null;
+  whatsapp_phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  primary_color?: string | null;
+  default_language?: "en" | "ar" | "both";
+  logo_url?: string | null;
+  cover_image_url?: string | null;
+};
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +49,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const updates: Record<string, string | null> = {};
+    const updates: RestaurantUpdate = {};
 
     const normalizeText = (value: unknown) =>
       typeof value === "string" && value.trim().length > 0
@@ -77,9 +91,9 @@ export async function POST(request: Request) {
         typeof body.default_language === "string"
           ? body.default_language
           : null;
-      updates.default_language = lang && LANGUAGE_VALUES.has(lang)
-        ? lang
-        : "en";
+      updates.default_language = (lang && LANGUAGE_VALUES.has(lang)
+        ? (lang as "en" | "ar" | "both")
+        : "en");
     }
 
     if ("logo_url" in body) {
@@ -97,7 +111,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error: updateError } = await supabase
+    const serviceSupabase = createSupabaseServiceRoleClient();
+
+    const { data, error: updateError } = await serviceSupabase
       .from("restaurants")
       .update(updates)
       .eq("id", restaurantId)
