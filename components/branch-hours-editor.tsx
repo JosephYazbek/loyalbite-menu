@@ -79,6 +79,13 @@ export function BranchHoursEditor({ value, onChange }: BranchHoursEditorProps) {
     ensureOpeningHours(value)
   );
 
+  const getMeridiem = (timeValue: string | null) => {
+    if (!timeValue) return "AM";
+    const [hourString] = timeValue.split(":");
+    const hour = Number(hourString);
+    return Number.isFinite(hour) && hour >= 12 ? "PM" : "AM";
+  };
+
 const updateDay = (day: keyof OpeningHours, patch: Partial<OpeningHoursDay>) => {
   setLocal((prev) => {
     const next: OpeningHours = {
@@ -126,25 +133,35 @@ const updateDay = (day: keyof OpeningHours, patch: Partial<OpeningHoursDay>) => 
                 </label>
 
                 <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    className="w-36 rounded-2xl border border-border bg-background px-4 pr-10 py-2 text-sm uppercase tracking-[0.15em] disabled:bg-gray-100"
-                    value={day.open ?? ""}
-                    onChange={(e) =>
-                      updateDay(dayKey, { open: e.target.value || null })
-                    }
-                    disabled={day.closed}
-                  />
+                  <div className="relative w-40">
+                    <input
+                      type="time"
+                      className="time-input w-full appearance-none rounded-2xl border border-border bg-background px-4 pr-14 py-2 text-sm font-medium text-slate-900 disabled:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/40"
+                      value={day.open ?? ""}
+                      onChange={(e) =>
+                        updateDay(dayKey, { open: e.target.value || null })
+                      }
+                      disabled={day.closed}
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
+                      {getMeridiem(day.open)}
+                    </span>
+                  </div>
                   <span className="text-xs text-gray-400">to</span>
-                  <input
-                    type="time"
-                    className="w-36 rounded-2xl border border-border bg-background px-4 pr-10 py-2 text-sm uppercase tracking-[0.15em] disabled:bg-gray-100"
-                    value={day.close ?? ""}
-                    onChange={(e) =>
-                      updateDay(dayKey, { close: e.target.value || null })
-                    }
-                    disabled={day.closed}
-                  />
+                  <div className="relative w-40">
+                    <input
+                      type="time"
+                      className="time-input w-full appearance-none rounded-2xl border border-border bg-background px-4 pr-14 py-2 text-sm font-medium text-slate-900 disabled:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/40"
+                      value={day.close ?? ""}
+                      onChange={(e) =>
+                        updateDay(dayKey, { close: e.target.value || null })
+                      }
+                      disabled={day.closed}
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
+                      {getMeridiem(day.close)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

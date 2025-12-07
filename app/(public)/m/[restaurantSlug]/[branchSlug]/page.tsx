@@ -47,6 +47,14 @@ type ItemRecord = {
   display_order: number | null;
 };
 
+type OverrideRecord = {
+  item_id: string;
+  price: number | string | null;
+  secondary_price: number | string | null;
+  is_available: boolean | null;
+  display_order: number | null;
+};
+
 export default async function BranchPublicMenuPage({
   params,
   searchParams,
@@ -140,9 +148,18 @@ export default async function BranchPublicMenuPage({
         )
         .eq("restaurant_id", restaurant.id)
         .eq("is_visible", true)
-        .eq("is_available", true)
         .order("display_order", { ascending: true }),
     ]);
+
+  const { data: overridesData, error: overridesError } = await supabase
+    .from("item_branch_overrides")
+    .select("item_id, price, secondary_price, is_available, display_order")
+    .eq("restaurant_id", restaurant.id)
+    .eq("branch_id", branch.id);
+
+  if (overridesError) {
+    console.error("[PUBLIC MENU] overrides error", overridesError);
+  }
 
   if (categoriesError) {
     console.error("[PUBLIC MENU] categories error", categoriesError);
@@ -165,12 +182,33 @@ export default async function BranchPublicMenuPage({
     itemsByCategory.set(item.category_id, list);
   });
 
+  const overridesMap = new Map<string, OverrideRecord>();
+  (overridesData ?? []).forEach((override) => {
+    overridesMap.set(override.item_id, override);
+  });
+
   const categories = (categoriesData ?? [])
     .map((category) => ({
       ...category,
-      items: (itemsByCategory.get(category.id) ?? []).sort(
-        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
-      ),
+      items: (itemsByCategory.get(category.id) ?? [])
+        .map((item) => {
+          const override = overridesMap.get(item.id);
+          const effectiveAvailability = override?.is_available ?? item.is_available;
+          if (effectiveAvailability === false) {
+            return null;
+          }
+
+          return {
+            ...item,
+            price: override?.price ?? item.price,
+            secondary_price: override?.secondary_price ?? item.secondary_price,
+            display_order: override?.display_order ?? item.display_order,
+          };
+        })
+        .filter((item): item is ItemRecord => Boolean(item))
+        .sort(
+          (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+        ),
     }))
     .filter((category) => category.items.length > 0);
 

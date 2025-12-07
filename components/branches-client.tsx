@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   BranchHoursEditor,
@@ -10,6 +11,12 @@ import { BranchQrModal } from "@/components/branch-qr-modal";
 import { Button } from "@/components/ui/button";
 import { getPublicMenuUrl } from "@/lib/public-menu";
 import { slugify } from "@/lib/slug";
+import {
+  COUNTRY_OPTIONS,
+  formatInternationalNumber,
+  sanitizeDigits,
+  splitInternationalNumber,
+} from "@/lib/phone-utils";
 
 type BranchRecord = {
   id: string;
@@ -48,7 +55,9 @@ type FormState = {
   slug: string;
   address: string;
   phone: string;
+  phoneCountryCode: string;
   whatsapp: string;
+  whatsappCountryCode: string;
   is_active: boolean;
   opening_hours: OpeningHours | null;
 };
@@ -58,7 +67,9 @@ const EMPTY_FORM: FormState = {
   slug: "",
   address: "",
   phone: "",
+  phoneCountryCode: "+961",
   whatsapp: "",
+  whatsappCountryCode: "+961",
   is_active: true,
   opening_hours: ensureOpeningHours(null),
 };
@@ -107,24 +118,34 @@ export function BranchesClient() {
 
   const openCreateForm = () => {
     setFormMode("create");
-    setFormState(EMPTY_FORM);
+    setFormState({
+      ...EMPTY_FORM,
+      opening_hours: ensureOpeningHours(null),
+    });
     setFormOpen(true);
     setApiState({ status: "idle" });
   };
 
   const openEditForm = (branch: BranchRecord) => {
     setFormMode("edit");
+    const phoneSplit = splitInternationalNumber(branch.phone, "+961");
+    const whatsappSplit = splitInternationalNumber(
+      branch.whatsapp_number,
+      phoneSplit.code
+    );
     setFormState({
       id: branch.id,
       name: branch.name,
       slug: branch.slug,
       address: branch.address ?? "",
-      phone: branch.phone ?? "",
-      whatsapp: branch.whatsapp_number ?? "",
+      phone: phoneSplit.number,
+      phoneCountryCode: phoneSplit.code,
+      whatsapp: whatsappSplit.number,
+      whatsappCountryCode: whatsappSplit.code,
       is_active: branch.is_active,
       opening_hours: branch.opening_hours
-      ? ensureOpeningHours(branch.opening_hours)
-      : ensureOpeningHours(null),
+        ? ensureOpeningHours(branch.opening_hours)
+        : ensureOpeningHours(null),
     });
     setFormOpen(true);
     setApiState({ status: "idle" });
@@ -132,7 +153,10 @@ export function BranchesClient() {
 
   const closeForm = () => {
     setFormOpen(false);
-    setFormState(EMPTY_FORM);
+    setFormState({
+      ...EMPTY_FORM,
+      opening_hours: ensureOpeningHours(null),
+    });
   };
 
   const handleChange = (field: keyof FormState, value: unknown) => {
@@ -141,9 +165,13 @@ export function BranchesClient() {
         return { ...prev, slug: slugify(String(value ?? "")) };
       }
 
+      if (field === "phone" || field === "whatsapp") {
+        return { ...prev, [field]: sanitizeDigits(String(value ?? "")) };
+      }
+
       const next: FormState = {
         ...prev,
-        [field]: value,
+        [field]: value as FormState[typeof field],
       };
 
       if (field === "name" && !prev.slug) {
@@ -161,12 +189,21 @@ export function BranchesClient() {
     try {
       const safeSlug = slugify(formState.slug || formState.name);
 
+      const normalizedPhone = formatInternationalNumber(
+        formState.phoneCountryCode,
+        formState.phone
+      );
+      const normalizedWhatsapp = formatInternationalNumber(
+        formState.whatsappCountryCode,
+        formState.whatsapp
+      );
+
       const payload = {
         name: formState.name,
         slug: safeSlug,
         address: formState.address,
-        phone: formState.phone,
-        whatsapp: formState.whatsapp,
+        phone: normalizedPhone,
+        whatsapp: normalizedWhatsapp,
         is_active: formState.is_active,
         opening_hours: formState.opening_hours,
       };
@@ -390,6 +427,11 @@ export function BranchesClient() {
               ) : null}
 
               <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/admin/branches/${branch.id}/pricing`}>
+                    Prices
+                  </Link>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -460,28 +502,47 @@ export function BranchesClient() {
                 />
               </div>
 
-              {/* phone / whatsapp */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium">Phone</label>
-                  <input
-                    type="text"
-                    value={formState.phone}
-                    onChange={(e) => handleChange("phone", e.target.value)}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium">WhatsApp</label>
-                  <input
-                    type="text"
-                    value={formState.whatsapp}
-                    onChange={(e) => handleChange("whatsapp", e.target.value)}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
+      {/* phone / whatsapp */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[
+          { label: "Phone", codeKey: "phoneCountryCode", numberKey: "phone" },
+          {
+            label: "WhatsApp",
+            codeKey: "whatsappCountryCode",
+            numberKey: "whatsapp",
+          },
+        ].map(({ label, codeKey, numberKey }) => (
+          <div key={label} className="space-y-2">
+            <label className="text-xs font-medium">{label}</label>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,8rem)_1fr]">
+              <select
+                className="w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+                value={formState[codeKey as "phoneCountryCode"]}
+                onChange={(e) =>
+                  handleChange(codeKey as keyof FormState, e.target.value)
+                }
+                disabled={apiState.status === "loading"}
+              >
+                {COUNTRY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formState[numberKey as "phone"]}
+                onChange={(e) =>
+                  handleChange(numberKey as keyof FormState, e.target.value)
+                }
+                className="w-full rounded-2xl border border-border px-3 py-2 text-sm"
+                placeholder="e.g. 81336572"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
 
               {/* active */}
               <div className="flex items-center gap-2">

@@ -136,3 +136,7 @@ textarea:focus {
   outline: none;
   box-shadow: 0 0 0 1px var(--ring);
 }
+
+.time-input::-webkit-datetime-edit-ampm-field {
+  display: none;
+}

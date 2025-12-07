@@ -401,7 +401,7 @@ export function MenuClient({
               <button
                 type="button"
                 onClick={handleWhatsAppClick}
-                className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                // className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 aria-label={labels.whatsappCta}
               >
                 <WhatsAppLogo className="h-14 w-14" />

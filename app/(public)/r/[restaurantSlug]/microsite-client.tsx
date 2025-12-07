@@ -343,7 +343,7 @@ export default function MicrositeClient({
               <button
                 type="button"
                 onClick={handleWhatsApp}
-                className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-lg transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                // className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-lg transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                 aria-label={labels.contact}
               >
                 <WhatsAppLogo className="h-14 w-14" />
@@ -412,43 +412,57 @@ export default function MicrositeClient({
               </h2>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 {restaurant.contact.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-slate-400" />
+                  <div className="group flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900">
+                    <Phone className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-600" />
                     <a
                       href={`tel:${restaurant.contact.phone}`}
-                      className="hover:text-slate-900"
+                      className="transition-colors group-hover:text-slate-900"
                     >
                       {restaurant.contact.phone}
                     </a>
                   </div>
                 )}
                 {restaurant.contact.whatsapp && (
-                  <div className="flex items-center gap-2">
-                    <WhatsAppLogo className="h-4 w-4 text-slate-400" />
-                    <span className="text-slate-600">
-                      {restaurant.contact.whatsapp}
-                    </span>
+                  <div className="group flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900">
+                    <WhatsAppLogo
+                      variant="mono"
+                      className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-600"
+                    />
+                    {whatsappUrl ? (
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="transition-colors group-hover:text-slate-900"
+                      >
+                        {restaurant.contact.whatsapp}
+                      </a>
+                    ) : (
+                      <span className="transition-colors group-hover:text-slate-900">
+                        {restaurant.contact.whatsapp}
+                      </span>
+                    )}
                   </div>
                 )}
                 {restaurant.contact.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-slate-400" />
+                  <div className="group flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900">
+                    <Mail className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-600" />
                     <a
                       href={`mailto:${restaurant.contact.email}`}
-                      className="hover:text-slate-900"
+                      className="transition-colors group-hover:text-slate-900"
                     >
                       {restaurant.contact.email}
                     </a>
                   </div>
                 )}
                 {restaurant.contact.website && (
-                  <div className="flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4 text-slate-400" />
+                  <div className="group flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900">
+                    <LinkIcon className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-600" />
                     <a
                       href={restaurant.contact.website}
                       target="_blank"
                       rel="noreferrer"
-                      className="hover:text-white"
+                      className="transition-colors group-hover:text-slate-900"
                     >
                       {restaurant.contact.website}
                     </a>
