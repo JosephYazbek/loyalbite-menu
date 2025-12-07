@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { MenuClient } from "./menu-client";
 import { determineInitialLanguage, resolveLanguageParam } from "@/lib/language";
+import { parseRestaurantProfileMeta } from "@/lib/restaurant-profile";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -76,6 +77,7 @@ export default async function BranchPublicMenuPage({
         "description_en",
         "description_ar",
         "logo_url",
+        "description",
         "primary_color",
         "default_language",
         "cover_image_url",
@@ -187,6 +189,16 @@ export default async function BranchPublicMenuPage({
     overridesMap.set(override.item_id, override);
   });
 
+  const profileMeta = parseRestaurantProfileMeta(restaurant.description);
+  const conversionRate = profileMeta.conversionRate;
+  const convertSecondary = (priceValue: number | string | null) => {
+    if (!conversionRate) return null;
+    const numeric =
+      typeof priceValue === "number" ? priceValue : Number(priceValue);
+    if (!Number.isFinite(numeric)) return null;
+    return Number((numeric * conversionRate).toFixed(0));
+  };
+
   const categories = (categoriesData ?? [])
     .map((category) => ({
       ...category,
@@ -198,10 +210,14 @@ export default async function BranchPublicMenuPage({
             return null;
           }
 
+          const effectivePrice = override?.price ?? item.price;
           return {
             ...item,
-            price: override?.price ?? item.price,
-            secondary_price: override?.secondary_price ?? item.secondary_price,
+            price: effectivePrice,
+            secondary_price:
+              override?.secondary_price ??
+              item.secondary_price ??
+              convertSecondary(effectivePrice),
             display_order: override?.display_order ?? item.display_order,
           };
         })

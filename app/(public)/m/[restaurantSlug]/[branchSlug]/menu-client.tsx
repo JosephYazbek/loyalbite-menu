@@ -339,7 +339,7 @@ export function MenuClient({
       className="min-h-screen bg-slate-50 text-slate-900"
     >
       <header
-        className="relative overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800 pb-12 pt-16 text-white"
+        className="relative overflow-hidden bg-linear-to-b from-slate-900 to-slate-800 pb-12 pt-16 text-white"
         style={heroBackgroundStyles}
       >
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-4 px-6 text-center">
@@ -404,7 +404,7 @@ export function MenuClient({
                 // className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 aria-label={labels.whatsappCta}
               >
-                <WhatsAppLogo className="h-14 w-14" />
+                <WhatsAppLogo className="h-15 w-15" />
                 <span className="sr-only">{labels.whatsappCta}</span>
               </button>
             ) : null}

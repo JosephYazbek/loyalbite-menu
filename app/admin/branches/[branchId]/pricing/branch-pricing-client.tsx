@@ -181,7 +181,7 @@ export default function BranchPricingClient({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: payload }),
+          body: JSON.stringify({ branchId: branch.id, items: payload }),
         }
       );
 

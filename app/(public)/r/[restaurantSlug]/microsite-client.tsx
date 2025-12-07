@@ -17,6 +17,7 @@ import {
   Youtube,
   Twitter,
   Music2,
+  MessageCircle,
 } from "lucide-react";
 
 type RestaurantProfileMeta = {
@@ -281,7 +282,7 @@ export default function MicrositeClient({
       className="min-h-screen bg-slate-50 text-slate-900"
     >
       <header className="relative overflow-hidden" style={heroBackground}>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60" />
+        <div className="absolute inset-0 bg-linear-to-b from-black/30 to-black/60" />
         <div className="relative mx-auto flex min-h-[60vh] w-full max-w-5xl flex-col items-center gap-6 px-6 py-16 text-center text-white">
           <div className="flex w-full items-center justify-between">
             <div className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
@@ -344,9 +345,9 @@ export default function MicrositeClient({
                 type="button"
                 onClick={handleWhatsApp}
                 // className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-lg transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                aria-label={labels.contact}
+                // aria-label={labels.contact}
               >
-                <WhatsAppLogo className="h-14 w-14" />
+                <WhatsAppLogo className="h-13 w-13" />
                 <span className="sr-only">{labels.contact}</span>
               </button>
             ) : null}
@@ -425,7 +426,7 @@ export default function MicrositeClient({
                 {restaurant.contact.whatsapp && (
                   <div className="group flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900">
                     <WhatsAppLogo
-                      variant="mono"
+                      variant="contact"
                       className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-600"
                     />
                     {whatsappUrl ? (

@@ -32,7 +32,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const branchId = params.id;
+    const body = await request.json().catch(() => null);
+    const items = Array.isArray(body?.items)
+      ? (body.items as OverridePayload[])
+      : [];
+
+    const branchId = params.id ?? body?.branchId;
     if (!branchId) {
       return NextResponse.json(
         { error: "Missing branchId" },
@@ -66,11 +71,6 @@ export async function POST(
         { status: 404 }
       );
     }
-
-    const body = await request.json().catch(() => null);
-    const items = Array.isArray(body?.items)
-      ? (body.items as OverridePayload[])
-      : [];
 
     if (!items.length) {
       await supabase
