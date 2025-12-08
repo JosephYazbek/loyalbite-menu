@@ -453,8 +453,8 @@ export function BranchesClient() {
       )}
 
       {formOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4 py-8">
-          <div className="w-full max-w-xl space-y-6 overflow-auto rounded-2xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+          <div className="w-full max-w-xl space-y-6 overflow-auto rounded-2xl bg-card p-6 shadow-xl max-h-[90vh]">
             <div className="flex justify-between mb-4">
               <h2 className="font-semibold">
                 {formMode === "create" ? "Add Branch" : "Edit Branch"}

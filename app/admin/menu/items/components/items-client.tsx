@@ -506,7 +506,7 @@ export default function ItemsClient({
                   )}
                 >
                   <td className="px-4 py-4 align-middle">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-white text-muted-foreground transition">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-card text-muted-foreground transition">
                       <GripVertical className="h-4 w-4" />
                     </div>
                   </td>

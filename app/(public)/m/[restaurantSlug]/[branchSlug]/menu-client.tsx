@@ -336,7 +336,7 @@ export function MenuClient({
     <div
       dir={language === "ar" ? "rtl" : "ltr"}
       lang={language}
-      className="min-h-screen bg-slate-50 text-slate-900"
+      className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
       <header
         className="relative overflow-hidden bg-linear-to-b from-slate-900 to-slate-800 pb-12 pt-16 text-white"
@@ -448,7 +448,7 @@ export function MenuClient({
 
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         {categoryLookup.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm">
+          <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
             {labels.updatingMessage}
           </div>
         ) : (
@@ -459,7 +459,7 @@ export function MenuClient({
                 id={`cat-${category.id}`}
                 className="scroll-mt-24"
               >
-                <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-baseline sm:justify-between">
+                <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-baseline sm:justify-between dark:border-slate-800">
                   <div>
                     <p
                       className={cn(
@@ -473,7 +473,7 @@ export function MenuClient({
                     </p>
                     <h2
                       className={cn(
-                        "mt-1 text-2xl font-semibold text-slate-900",
+                        "mt-1 text-2xl font-semibold text-slate-900 dark:text-white",
                         language === "ar" && "text-right"
                       )}
                     >
@@ -482,7 +482,7 @@ export function MenuClient({
                     {category.localizedDescription && (
                       <p
                         className={cn(
-                          "text-sm text-slate-600",
+                          "text-sm text-slate-600 dark:text-slate-300",
                           language === "ar" && "text-right"
                         )}
                       >
@@ -492,7 +492,7 @@ export function MenuClient({
                   </div>
                   <span
                     className={cn(
-                      "text-xs uppercase tracking-[0.35em] text-slate-500",
+                      "text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400",
                       language === "ar" && "tracking-normal"
                     )}
                   >
@@ -522,9 +522,9 @@ export function MenuClient({
                       <article
                         key={item.id}
                         onClick={() => handleItemInteraction(item.id, category.id)}
-                        className="flex cursor-pointer flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md sm:flex-row sm:gap-6 sm:p-5"
+                        className="flex cursor-pointer flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:gap-6 sm:p-5"
                       >
-                        <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 sm:h-28 sm:w-28">
+                        <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800 sm:h-28 sm:w-28">
                           {item.image_url ? (
                             <Image
                               src={item.image_url}
@@ -534,7 +534,7 @@ export function MenuClient({
                               className="object-cover"
                             />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+                            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400 dark:text-slate-500">
                               {labels.noImage}
                             </div>
                           )}
@@ -545,7 +545,7 @@ export function MenuClient({
                             <div>
                               <h3
                                 className={cn(
-                                  "text-lg font-semibold text-slate-900",
+                                  "text-lg font-semibold text-slate-900 dark:text-white",
                                   language === "ar" && "text-right"
                                 )}
                               >
@@ -554,7 +554,7 @@ export function MenuClient({
                               {itemDescription && (
                                 <p
                                   className={cn(
-                                    "text-sm text-slate-600",
+                                    "text-sm text-slate-600 dark:text-slate-300",
                                     language === "ar" && "text-right"
                                   )}
                                 >
@@ -564,20 +564,20 @@ export function MenuClient({
                             </div>
                             <div
                               className={cn(
-                                "text-base font-semibold text-slate-900 text-right",
+                                "text-base font-semibold text-slate-900 text-right dark:text-white",
                                 language === "ar" && "text-left"
                               )}
                             >
                               {primaryPrice ?? "--"}
                               {secondaryPrice && (
-                                <p className="text-xs font-normal text-slate-500">
+                                <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
                                   {secondaryPrice}
                                 </p>
                               )}
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                          <div className="flex flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
                             {renderTag(item, "is_new")}
                             {renderTag(item, "is_popular")}
                             {renderTag(item, "is_spicy")}
@@ -596,7 +596,7 @@ export function MenuClient({
         )}
       </main>
 
-      <footer className="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
         {labels.footer}
       </footer>
     </div>

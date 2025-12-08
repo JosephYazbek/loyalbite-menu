@@ -52,13 +52,13 @@ export function ThemeSettingsPanel() {
   return (
     <section className="space-y-6 rounded-3xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-slate-900">Appearance</h2>
+        <h2 className="text-lg font-semibold text-foreground">Appearance</h2>
         <p className="text-sm text-muted-foreground">
           Choose how LoyalBite renders for every admin page. Changes apply
           instantly.
         </p>
         {liveDescription ? (
-          <p className="text-xs text-slate-500">{liveDescription}</p>
+          <p className="text-xs text-muted-foreground">{liveDescription}</p>
         ) : null}
       </div>
 
@@ -72,17 +72,19 @@ export function ThemeSettingsPanel() {
                 type="button"
                 onClick={() => setTheme(option.id)}
                 className={cn(
-                  "rounded-2xl border px-4 py-5 text-left transition hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                  "rounded-2xl border px-4 py-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                   isActive
-                    ? "border-slate-900 bg-slate-900 text-white shadow-lg"
-                    : "border-slate-200 bg-white/80 text-slate-700"
+                    ? "border-primary bg-primary text-primary-foreground shadow-lg"
+                    : "border-border/80 bg-card/80 text-foreground/80 hover:border-foreground/30"
                 )}
               >
                 <p className="text-base font-semibold">{option.label}</p>
                 <p
                   className={cn(
-                    "mt-2 text-sm",
-                    isActive ? "text-white/80" : "text-slate-500"
+                    "mt-2 text-sm transition-colors",
+                    isActive
+                      ? "text-primary-foreground/80"
+                      : "text-muted-foreground"
                   )}
                 >
                   {option.description}

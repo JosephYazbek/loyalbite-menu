@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useMemo, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -75,6 +75,14 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
     memberships[0]?.restaurant.id ?? ""
   )
 
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    document.body.classList.add("admin-shell")
+    return () => {
+      document.body.classList.remove("admin-shell")
+    }
+  }, [])
+
   const selectedMembership =
     memberships.find(
       (membership) => membership.restaurant.id === selectedRestaurantId
@@ -97,7 +105,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
 
   if (!memberships.length) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-slate-50 text-center px-6">
+      <div className="admin-shell min-h-screen flex flex-col items-center justify-center gap-6 bg-slate-50 text-center px-6">
         <div className="space-y-2 max-w-lg">
           <p className="text-sm text-muted-foreground uppercase tracking-wide">
             Welcome to LoyalBite
@@ -119,7 +127,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
 
   return (
     <AdminWorkspaceContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-background text-foreground transition-colors">
+      <div className="admin-shell min-h-screen bg-background text-foreground transition-colors">
         <div className="flex min-h-screen">
           <aside className="hidden md:flex w-64 flex-col border-r bg-card">
             <div className="px-6 py-6 border-b">

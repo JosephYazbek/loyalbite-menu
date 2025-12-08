@@ -501,7 +501,7 @@ export function ProfileForm({ restaurant }: ProfileFormProps) {
                 type="color"
                 value={formState.primaryColor}
                 onChange={handleChange("primaryColor")}
-                className="h-11 w-24 cursor-pointer rounded-2xl border border-border bg-white"
+                className="h-11 w-24 cursor-pointer rounded-2xl border border-border bg-card"
                 disabled={saving}
               />
               <Input

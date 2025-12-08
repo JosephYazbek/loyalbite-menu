@@ -212,10 +212,10 @@ export function BranchQrModal({
                       type="button"
                       onClick={() => setTheme(option.id as "light" | "dark")}
                       className={cn(
-                        "flex-1 rounded-2xl border px-3 py-2 text-sm transition",
+                        "flex-1 rounded-2xl border px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                         theme === option.id
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-200 text-slate-500 hover:border-slate-400"
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border text-muted-foreground hover:border-foreground/40"
                       )}
                     >
                       {option.label}
