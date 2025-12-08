@@ -32,6 +32,7 @@ export function CategoriesClient({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [duplicatingCategoryId, setDuplicatingCategoryId] = useState<string | null>(null);
 
   const canInteract = !(uploadingImage || reordering);
 
@@ -151,6 +152,29 @@ export function CategoriesClient({
 
     if (!res.ok) throw new Error("Failed to delete category");
     setCategories((prev) => prev.filter((cat) => cat.id !== id));
+  };
+
+  const handleDuplicate = async (category: Category) => {
+    setDuplicatingCategoryId(category.id);
+    try {
+      const res = await fetch(`/api/admin/categories/${category.id}/duplicate`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to duplicate category");
+        return;
+      }
+      if (data.category) {
+        setCategories((prev) => [...prev, data.category as Category]);
+      }
+      alert("Category duplicated.");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to duplicate category");
+    } finally {
+      setDuplicatingCategoryId(null);
+    }
   };
 
   const persistOrder = async (orderedIds: string[], previous: Category[]) => {
@@ -339,6 +363,11 @@ export function CategoriesClient({
                         <div className="text-xs text-muted-foreground">
                           Order #{cat.display_order}
                         </div>
+                        {cat.is_offers && (
+                          <div className="text-xs font-semibold text-amber-600">
+                            Offers section
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -351,7 +380,11 @@ export function CategoriesClient({
 
                   <td className="px-4 py-3 space-x-2">
                     {cat.is_visible && <Badge>Visible</Badge>}
-                    {cat.is_offers && <Badge variant="secondary">Offers</Badge>}
+                    {cat.is_offers && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                        Offers
+                      </Badge>
+                    )}
                   </td>
 
                   <td className="px-4 py-3 text-right space-x-2">
@@ -362,6 +395,16 @@ export function CategoriesClient({
                       disabled={!canInteract}
                     >
                       Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDuplicate(cat)}
+                      disabled={
+                        !canInteract || duplicatingCategoryId === cat.id
+                      }
+                    >
+                      Duplicate
                     </Button>
                     <Button
                       size="sm"

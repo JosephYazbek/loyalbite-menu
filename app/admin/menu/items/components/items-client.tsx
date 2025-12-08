@@ -41,6 +41,7 @@ export default function ItemsClient({
   const [reordering, setReordering] = useState(false);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | "">("");
+  const [duplicatingItemId, setDuplicatingItemId] = useState<string | null>(null);
 
   const categoriesById = useMemo(() => {
     const map: Record<string, any> = {};
@@ -60,6 +61,21 @@ export default function ItemsClient({
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId]
   );
+
+  const defaultPrintBranch = useMemo(
+    () =>
+      branches.find((branch) => branch.is_active && branch.slug) ??
+      branches.find((branch) => branch.slug) ??
+      null,
+    [branches]
+  );
+
+  const printMenuUrl =
+    restaurantSlug && defaultPrintBranch?.slug
+      ? `/m/${restaurantSlug}/${defaultPrintBranch.slug}/print?lang=${
+          restaurantDefaultLanguage === "ar" ? "ar" : "en"
+        }`
+      : null;
 
   const previewUrl =
     selectedBranch && restaurantSlug
@@ -103,6 +119,29 @@ export default function ItemsClient({
       setItems((prev) => prev.filter((it) => it.id !== itemId));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDuplicateItem = async (itemId: string) => {
+    setDuplicatingItemId(itemId);
+    try {
+      const res = await fetch(`/api/admin/items/${itemId}/duplicate`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to duplicate item");
+        return;
+      }
+      if (data.item) {
+        setItems((prev) => [...prev, data.item]);
+      }
+      alert("Item duplicated.");
+    } catch (error) {
+      console.error(error);
+      alert("Unable to duplicate item");
+    } finally {
+      setDuplicatingItemId(null);
     }
   };
 
@@ -452,6 +491,19 @@ export default function ItemsClient({
               <span>Preview Menu</span>
             )}
           </Button>
+          <Button
+            variant="outline"
+            disabled={!printMenuUrl}
+            asChild={Boolean(printMenuUrl)}
+          >
+            {printMenuUrl ? (
+              <a href={printMenuUrl} target="_blank" rel="noreferrer">
+                Print Menu
+              </a>
+            ) : (
+              <span>Print Menu</span>
+            )}
+          </Button>
           <Button onClick={handleAddClick} disabled={!canInteract}>
             + Add Item
           </Button>
@@ -621,6 +673,14 @@ export default function ItemsClient({
                         disabled={!canInteract}
                       >
                         Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDuplicateItem(item.id)}
+                        disabled={!canInteract || duplicatingItemId === item.id}
+                      >
+                        Duplicate
                       </Button>
                       <Button
                         variant="destructive"

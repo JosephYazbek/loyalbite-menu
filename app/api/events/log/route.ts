@@ -8,6 +8,7 @@ const EVENT_TYPES = new Set([
   "whatsapp_click",
   "microsite_view",
   "microsite_to_menu_click",
+  "menu_print_view",
 ]);
 
 type LogEventBody = {

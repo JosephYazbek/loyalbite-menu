@@ -323,23 +323,33 @@ export function CategoryModal({
             </div>
           </div>
 
-          <div className="flex justify-between">
-            <div className="flex items-center gap-2">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/40 px-3 py-2">
+              <div className="flex flex-col">
+                <Label className="text-sm font-medium">Visible in menu</Label>
+                <p className="text-xs text-muted-foreground">
+                  Hide this category to keep it off the public menu.
+                </p>
+              </div>
               <Switch
                 checked={values.is_visible}
                 onCheckedChange={handleField("is_visible")}
                 disabled={isBusy}
               />
-              <Label>Visible in menu</Label>
             </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/40 px-3 py-3">
+              <div className="flex flex-col">
+                <Label className="text-sm font-medium">Use as Offers section</Label>
+                <p className="text-xs text-muted-foreground">
+                  Items in this category will be highlighted at the top of your menu as special offers.
+                </p>
+              </div>
               <Switch
                 checked={values.is_offers}
                 onCheckedChange={handleField("is_offers")}
                 disabled={isBusy}
+                aria-label="Use as Offers section"
               />
-              <Label>Offers section</Label>
             </div>
           </div>
 

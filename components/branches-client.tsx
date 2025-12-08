@@ -83,6 +83,10 @@ export function BranchesClient() {
   const [copiedBranchId, setCopiedBranchId] = useState<string | null>(null);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrBranch, setQrBranch] = useState<BranchRecord | null>(null);
+  const [cloneModalOpen, setCloneModalOpen] = useState(false);
+  const [cloneTargetBranch, setCloneTargetBranch] = useState<BranchRecord | null>(null);
+  const [cloneSourceBranchId, setCloneSourceBranchId] = useState<string>("");
+  const [cloneState, setCloneState] = useState<ApiState>({ status: "idle" });
 
   const [formMode, setFormMode] = useState<FormMode>("create");
   const [formOpen, setFormOpen] = useState<boolean>(false);
@@ -90,6 +94,10 @@ export function BranchesClient() {
   const [apiState, setApiState] = useState<ApiState>({ status: "idle" });
   const defaultLangParam =
     restaurant?.default_language === "ar" ? "ar" : "en";
+  const buildPrintUrl = (target: BranchRecord) =>
+    restaurant?.slug && target.slug
+      ? `/m/${restaurant.slug}/${target.slug}/print?lang=${defaultLangParam}`
+      : null;
 
   // Load branches
   useEffect(() => {
@@ -299,6 +307,58 @@ export function BranchesClient() {
     setQrBranch(null);
   };
 
+  const openCloneModal = (branch: BranchRecord) => {
+    setCloneTargetBranch(branch);
+    const defaultSource =
+      branches.find((candidate) => candidate.id !== branch.id) ?? null;
+    setCloneSourceBranchId(defaultSource?.id ?? "");
+    setCloneState({ status: "idle" });
+    setCloneModalOpen(true);
+  };
+
+  const closeCloneModal = () => {
+    if (cloneState.status === "loading") return;
+    setCloneModalOpen(false);
+    setCloneTargetBranch(null);
+    setCloneSourceBranchId("");
+    setCloneState({ status: "idle" });
+  };
+
+  const handleCloneSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!cloneTargetBranch || !cloneSourceBranchId) return;
+    setCloneState({ status: "loading" });
+    try {
+      const res = await fetch(
+        `/api/admin/branches/${cloneTargetBranch.id}/clone-menu`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceBranchId: cloneSourceBranchId }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setCloneState({
+          status: "error",
+          message: data.error || "Failed to clone menu.",
+        });
+        return;
+      }
+      setCloneState({ status: "success" });
+      setCloneModalOpen(false);
+      setCloneTargetBranch(null);
+      setCloneSourceBranchId("");
+      alert("Branch menu cloned.");
+    } catch (error) {
+      setCloneState({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to clone menu.",
+      });
+    }
+  };
+
   // UI ----------------------
 
   if (loading) return <p>Loading branches...</p>;
@@ -342,11 +402,13 @@ export function BranchesClient() {
         </div>
       ) : (
         <div className="grid gap-5 md:grid-cols-2">
-          {branches.map((branch) => (
-            <div
-              key={branch.id}
-              className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5"
-            >
+          {branches.map((branch) => {
+            const printUrl = buildPrintUrl(branch);
+            return (
+              <div
+                key={branch.id}
+                className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5"
+              >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-base font-semibold text-foreground">
@@ -420,6 +482,20 @@ export function BranchesClient() {
                   >
                     Preview Menu
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="text-sm"
+                    disabled={!printUrl}
+                    asChild={Boolean(printUrl)}
+                  >
+                    {printUrl ? (
+                      <Link href={printUrl} target="_blank" rel="noreferrer">
+                        Print
+                      </Link>
+                    ) : (
+                      <span>Print</span>
+                    )}
+                  </Button>
                   {copiedBranchId === branch.id && (
                     <span className="text-xs text-green-600">Copied!</span>
                   )}
@@ -431,6 +507,14 @@ export function BranchesClient() {
                   <Link href={`/admin/branches/${branch.id}/pricing`}>
                     Prices
                   </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openCloneModal(branch)}
+                  disabled={branches.length <= 1}
+                >
+                  Clone menu
                 </Button>
                 <Button
                   variant="outline"
@@ -447,8 +531,9 @@ export function BranchesClient() {
                   Delete
                 </Button>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -585,6 +670,70 @@ export function BranchesClient() {
         branchName={qrBranch?.name ?? ""}
         branchSlug={qrBranch?.slug ?? ""}
       />
+      {cloneModalOpen && cloneTargetBranch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+          <div className="w-full max-w-md space-y-4 rounded-2xl bg-card p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Clone menu</h2>
+              <button
+                onClick={closeCloneModal}
+                className="text-sm text-muted-foreground hover:text-foreground"
+                disabled={cloneState.status === "loading"}
+              >
+                Close
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Copy branch-specific prices, availability, and ordering from
+              another branch into <strong>{cloneTargetBranch.name}</strong>.
+            </p>
+            <form className="space-y-4" onSubmit={handleCloneSubmit}>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Source branch</label>
+                <select
+                  className="w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+                  value={cloneSourceBranchId}
+                  onChange={(event) => setCloneSourceBranchId(event.target.value)}
+                  disabled={cloneState.status === "loading"}
+                >
+                  <option value="">Select branch</option>
+                  {branches
+                    .filter((candidate) => candidate.id !== cloneTargetBranch.id)
+                    .map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.name}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Existing overrides for {cloneTargetBranch.name} will be replaced.
+                </p>
+              </div>
+              {cloneState.status === "error" && cloneState.message && (
+                <p className="text-sm text-red-500">{cloneState.message}</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeCloneModal}
+                  disabled={cloneState.status === "loading"}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    !cloneSourceBranchId || cloneState.status === "loading"
+                  }
+                >
+                  {cloneState.status === "loading" ? "Cloning..." : "Clone menu"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

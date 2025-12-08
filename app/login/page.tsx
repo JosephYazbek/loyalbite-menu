@@ -1,59 +1,258 @@
-'use client';
+"use client";
 
-import { useState, FormEvent } from 'react';
-import { supabaseBrowser } from '@/lib/supabaseBrowser';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { useRouter } from "next/navigation";
+
+type Mode = "login" | "signup";
+
+const EMAIL_KEY = "lb_auth_email";
+const REMEMBER_KEY = "lb_auth_remember";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<Mode>("login");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const signIn = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const { error } = await supabaseBrowser.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
+  useEffect(() => {
+    try {
+      const storedEmail = window.localStorage.getItem(EMAIL_KEY);
+      const storedRemember = window.localStorage.getItem(REMEMBER_KEY);
+      if (storedEmail) setEmail(storedEmail);
+      if (storedRemember) setRememberMe(storedRemember === "true");
+    } catch {
+      // ignore storage failures
     }
+  }, []);
 
-    router.push('/admin');
+  useEffect(() => {
+    try {
+      if (rememberMe && email) {
+        window.localStorage.setItem(EMAIL_KEY, email);
+      } else {
+        window.localStorage.removeItem(EMAIL_KEY);
+      }
+      window.localStorage.setItem(REMEMBER_KEY, String(rememberMe));
+    } catch {
+      // ignore
+    }
+  }, [rememberMe, email]);
+
+  const handleAuth = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      if (mode === "signup") {
+        const { data, error: signUpError } = await supabaseBrowser.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName },
+            emailRedirectTo:
+              typeof window !== "undefined"
+                ? `${window.location.origin}/admin`
+                : undefined,
+          },
+        });
+
+        if (signUpError) {
+          setError(signUpError.message);
+          return;
+        }
+
+        if (data.session) {
+          router.push("/admin");
+        } else {
+          setMessage("Check your inbox to verify your email before signing in.");
+        }
+        return;
+      }
+
+      const { error: signInError } =
+        await supabaseBrowser.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      router.push("/admin");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setError(null);
+    try {
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/admin`
+          : undefined;
+      await supabaseBrowser.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed.");
+    }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-      <form
-        onSubmit={signIn}
-        className="bg-gray-800 p-8 rounded-xl space-y-4 w-full max-w-sm"
-      >
-        <h1 className="text-xl font-bold text-center">Admin Login</h1>
+    <div className="min-h-screen bg-slate-950/95 px-4 py-12 text-white sm:px-8">
+      <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+        <div className="space-y-4">
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+            LoyalBite Admin
+          </p>
+          <h1 className="text-4xl font-semibold text-white">
+            {mode === "signup" ? "Create your workspace" : "Sign in to manage menus"}
+          </h1>
+          <p className="max-w-md text-sm text-slate-300">
+            Access analytics, edit menus, and update branches from one dashboard.{" "}
+            {mode === "signup"
+              ? "Set up your credentials to get started instantly."
+              : 'Your session stays active when "Remember me" is enabled.'}
+          </p>
+        </div>
 
-        <input
-          className="w-full p-2 rounded bg-gray-700"
-          placeholder="Email"
-          type="email"
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div className="mt-10 w-full max-w-md rounded-3xl bg-white p-8 text-slate-900 shadow-2xl">
+          <div className="space-y-1 text-center">
+            <h2 className="text-2xl font-semibold">
+              {mode === "signup" ? "Sign up" : "Welcome back"}
+            </h2>
+            <p className="text-sm text-slate-500">
+              {mode === "signup"
+                ? "Create a restaurant owner profile in seconds."
+                : "Enter your credentials to continue."}
+            </p>
+          </div>
 
-        <input
-          className="w-full p-2 rounded bg-gray-700"
-          placeholder="Password"
-          type="password"
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <form onSubmit={handleAuth} className="mt-6 space-y-4">
+            {mode === "signup" && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Full name
+                </label>
+                <input
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  placeholder="e.g. Jenna Allen"
+                  disabled={loading}
+                />
+              </div>
+            )}
 
-        <button
-          type="submit"
-          className="w-full bg-blue-500 p-2 rounded font-semibold"
-        >
-          Login
-        </button>
-      </form>
+            <div className="space-y-1.5 text-left">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Email
+              </label>
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="you@restaurant.com"
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Password
+              </label>
+              <input
+                type="password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="••••••••"
+                disabled={loading}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/30"
+                />
+                Remember me
+              </label>
+              <button
+                type="button"
+                onClick={() => setMode(mode === "signup" ? "login" : "signup")}
+                className="font-semibold text-slate-900"
+              >
+                {mode === "signup" ? "Already have an account?" : "Need an account?"}
+              </button>
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            {message && <p className="text-sm text-green-600">{message}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-70"
+            >
+              {loading
+                ? "Please wait..."
+                : mode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
+            </button>
+          </form>
+
+          <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-slate-400">
+            <div className="h-px flex-1 bg-slate-200" />
+            or
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogle}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400"
+          >
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="#EA4335"
+                d="M12 10.2v3.9h5.4c-.2 1.2-1.4 3.5-5.4 3.5-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.6 2.4 14.5 1.5 12 1.5 6.8 1.5 2.6 5.7 2.6 11s4.2 9.5 9.4 9.5c5.4 0 9-3.8 9-9.2 0-.6-.1-1-.2-1.5H12z"
+              />
+            </svg>
+            Continue with Google
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
+

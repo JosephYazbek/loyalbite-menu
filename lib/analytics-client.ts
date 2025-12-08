@@ -11,7 +11,8 @@ export type AnalyticsEventPayload = {
     | "item_view"
     | "whatsapp_click"
     | "microsite_view"
-    | "microsite_to_menu_click";
+    | "microsite_to_menu_click"
+    | "menu_print_view";
   language?: "en" | "ar";
 };
 

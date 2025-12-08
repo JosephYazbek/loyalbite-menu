@@ -149,7 +149,7 @@ export default async function AnalyticsPage({
         .eq("restaurant_id", restaurantId),
       supabase
         .from("categories")
-        .select("id, name_en")
+        .select("id, name_en, is_offers")
         .eq("restaurant_id", restaurantId),
       supabase
         .from("items")
@@ -164,8 +164,22 @@ export default async function AnalyticsPage({
   const branchMap = new Map<string, string>(
     (branches ?? []).map((branch) => [branch.id, branch.name])
   );
-  const categoryMap = new Map<string, string>(
-    (categories ?? []).map((category) => [category.id, category.name_en ?? "Unnamed"])
+  const categoryMap = new Map<
+    string,
+    { name: string; isOffers: boolean }
+  >(
+    (categories ?? []).map((category) => [
+      category.id,
+      {
+        name: category.name_en ?? "Uncategorized",
+        isOffers: Boolean(category.is_offers),
+      },
+    ])
+  );
+  const offerCategoryIds = new Set(
+    (categories ?? [])
+      .filter((category) => category.is_offers)
+      .map((category) => category.id)
   );
   const itemMap = new Map<string, { name: string; categoryId: string | null }>(
     (items ?? []).map((item) => [
@@ -175,6 +189,19 @@ export default async function AnalyticsPage({
   );
 
   const analyticsEvents: AnalyticsEvent[] = events ?? [];
+  let offerSectionViews = 0;
+  let offerItemViews = 0;
+  analyticsEvents.forEach((event) => {
+    if (!event.category_id || !offerCategoryIds.has(event.category_id)) {
+      return;
+    }
+    if (event.event_type === "category_view") {
+      offerSectionViews += 1;
+    }
+    if (event.event_type === "item_view") {
+      offerItemViews += 1;
+    }
+  });
 
   const menuViews = analyticsEvents.filter(
     (event) => event.event_type === "menu_view"
@@ -230,7 +257,7 @@ export default async function AnalyticsPage({
   )
     .map(([categoryId, views]) => ({
       categoryId,
-      categoryName: categoryMap.get(categoryId) ?? "Uncategorized",
+      categoryName: categoryMap.get(categoryId)?.name ?? "Uncategorized",
       views,
       share: totalCategoryViews ? views / totalCategoryViews : 0,
     }))
@@ -253,7 +280,7 @@ export default async function AnalyticsPage({
         itemId,
         itemName: meta?.name ?? "Unknown",
         categoryName: meta?.categoryId
-          ? categoryMap.get(meta.categoryId) ?? "Uncategorized"
+          ? categoryMap.get(meta.categoryId)?.name ?? "Uncategorized"
           : "Uncategorized",
         views,
       };
@@ -349,6 +376,10 @@ export default async function AnalyticsPage({
         <KpiCard title="Most used language" value={languageLabel} />
         <KpiCard title="Mobile traffic" value={`${mobilePercentage}%`} />
         <KpiCard title="WhatsApp clicks" value={whatsappClicks} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <KpiCard title="Offer section views" value={offerSectionViews} />
+        <KpiCard title="Offer item views" value={offerItemViews} />
       </div>
 
       <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">

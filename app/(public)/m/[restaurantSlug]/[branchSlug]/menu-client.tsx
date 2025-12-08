@@ -36,6 +36,8 @@ type CategoryWithItems = {
   name_ar: string | null;
   description_en: string | null;
   description_ar: string | null;
+  is_offers?: boolean | null;
+  is_visible?: boolean | null;
   items: ItemRecord[];
 };
 
@@ -248,6 +250,7 @@ export function MenuClient({
 
   const resolvedAccent = restaurant.primary_color?.trim() || accentColor;
   const labels = UI_TEXT[language];
+  const offersLabel = language === "ar" ? "عروض اليوم" : "TODAY'S OFFERS";
 
   const heroDescription =
     (
@@ -281,12 +284,27 @@ export function MenuClient({
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   }, [branch.id, restaurant.id, whatsappUrl]);
 
-  const categoryLookup = useMemo(() => {
-    return categories.map((category) => {
+  const sortedCategories = useMemo(() => {
+    const offers: CategoryWithItems[] = [];
+    const regular: CategoryWithItems[] = [];
+    categories.forEach((category) => {
+      const isVisible = category.is_visible ?? true;
+      if (!isVisible || category.items.length === 0) return;
+      if (category.is_offers) {
+        offers.push(category);
+      } else {
+        regular.push(category);
+      }
+    });
+    return [...offers, ...regular];
+  }, [categories]);
+
+  const displayCategories = useMemo(() => {
+    return sortedCategories.map((category) => {
       const localizedName =
         language === "ar"
-          ? category.name_ar?.trim() || category.name_en?.trim() || "—"
-          : category.name_en?.trim() || category.name_ar?.trim() || "—";
+          ? category.name_ar?.trim() || category.name_en?.trim() || "-"
+          : category.name_en?.trim() || category.name_ar?.trim() || "-";
       const localizedDescription =
         language === "ar"
           ? category.description_ar?.trim() || category.description_en?.trim() || ""
@@ -297,7 +315,7 @@ export function MenuClient({
         localizedDescription,
       };
     });
-  }, [categories, language]);
+  }, [sortedCategories, language]);
 
   const getItemName = (item: ItemRecord) =>
     language === "ar"
@@ -309,6 +327,163 @@ export function MenuClient({
       ? item.description_ar?.trim() || item.description_en?.trim() || ""
       : item.description_en?.trim() || item.description_ar?.trim() || "";
 
+  const renderItem = (categoryId: string, item: ItemRecord) => {
+    const primaryPrice = formatPrice(
+      item.price,
+      item.primary_currency,
+      language
+    );
+    const secondaryPrice = formatPrice(
+      item.secondary_price,
+      item.secondary_currency,
+      language
+    );
+
+    return (
+      <article
+        key={item.id}
+        onClick={() => handleItemInteraction(item.id, categoryId)}
+        className="flex cursor-pointer flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:gap-6 sm:p-5"
+      >
+        <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800 sm:h-28 sm:w-28">
+          {item.image_url ? (
+            <Image
+              src={item.image_url}
+              alt={getItemName(item)}
+              fill
+              sizes="112px"
+              className="object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400 dark:text-slate-500">
+              {labels.noImage}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col gap-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3
+                className={cn(
+                  "text-lg font-semibold text-slate-900 dark:text-white",
+                  language === "ar" && "text-right"
+                )}
+              >
+                {getItemName(item)}
+              </h3>
+              {getItemDescription(item) && (
+                <p
+                  className={cn(
+                    "text-sm text-slate-600 dark:text-slate-300",
+                    language === "ar" && "text-right"
+                  )}
+                >
+                  {getItemDescription(item)}
+                </p>
+              )}
+            </div>
+            <div
+              className={cn(
+                "text-base font-semibold text-slate-900 text-right dark:text-white",
+                language === "ar" && "text-left"
+              )}
+            >
+              {primaryPrice ?? "--"}
+              {secondaryPrice && (
+                <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {secondaryPrice}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
+            {renderTag(item, "is_new")}
+            {renderTag(item, "is_popular")}
+            {renderTag(item, "is_spicy")}
+            {renderTag(item, "is_vegetarian")}
+            {renderTag(item, "is_vegan")}
+            {renderTag(item, "is_gluten_free")}
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  const renderCategory = (
+    category: (typeof displayCategories)[number]
+  ): JSX.Element => {
+    return (
+      <section
+        key={category.id}
+        id={`cat-${category.id}`}
+        className="scroll-mt-24"
+      >
+        <div
+          className={cn(
+            "space-y-4",
+            category.is_offers
+              ? "rounded-3xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm dark:bg-amber-500/10 sm:p-6"
+              : ""
+          )}
+        >
+          <div
+            className={cn(
+              "flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-baseline sm:justify-between dark:border-slate-800",
+              category.is_offers && "border-amber-500/30"
+            )}
+          >
+            <div>
+              <p
+                className={cn(
+                  "text-amber-600/80",
+                  language === "en"
+                    ? "text-xs uppercase tracking-[0.25em]"
+                    : "text-sm font-semibold"
+                )}
+              >
+                {category.is_offers ? offersLabel : labels.curatedSelection}
+              </p>
+              <h2
+                className={cn(
+                  "mt-1 text-2xl font-semibold text-slate-900 dark:text-white",
+                  language === "ar" && "text-right"
+                )}
+              >
+                {category.localizedName}
+              </h2>
+              {category.localizedDescription && (
+                <p
+                  className={cn(
+                    "text-sm text-slate-600 dark:text-slate-300",
+                    language === "ar" && "text-right"
+                  )}
+                >
+                  {category.localizedDescription}
+                </p>
+              )}
+            </div>
+            <span
+              className={cn(
+                "text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400",
+                language === "ar" && "tracking-normal"
+              )}
+            >
+              {category.items.length}{" "}
+              {category.items.length === 1
+                ? labels.itemsSingle
+                : labels.itemsPlural}
+            </span>
+          </div>
+
+          <div className="grid gap-4">
+            {category.items.map((item) => renderItem(category.id, item))}
+          </div>
+        </div>
+      </section>
+    );
+  };
   const renderTag = (item: ItemRecord, field: keyof typeof TAG_LABELS.en) => {
     if (!item[field]) return null;
     return (
@@ -411,7 +586,7 @@ export function MenuClient({
           </div>
         </div>
 
-        {categoryLookup.length > 0 && (
+        {displayCategories.length > 0 && (
           <div className="mx-auto mt-8 w-full max-w-4xl px-6">
             <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur">
               <p
@@ -430,7 +605,7 @@ export function MenuClient({
                   language === "ar" && "flex-row-reverse"
                 )}
               >
-                {categoryLookup.map((category) => (
+                {displayCategories.map((category) => (
                   <button
                     key={category.id}
                     type="button"
@@ -447,151 +622,13 @@ export function MenuClient({
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        {categoryLookup.length === 0 ? (
+        {displayCategories.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
             {labels.updatingMessage}
           </div>
         ) : (
           <div className="space-y-10">
-            {categoryLookup.map((category) => (
-              <section
-                key={category.id}
-                id={`cat-${category.id}`}
-                className="scroll-mt-24"
-              >
-                <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-baseline sm:justify-between dark:border-slate-800">
-                  <div>
-                    <p
-                      className={cn(
-                        "text-amber-600/80",
-                        language === "en"
-                          ? "text-xs uppercase tracking-[0.25em]"
-                          : "text-sm font-semibold"
-                      )}
-                    >
-                      {labels.curatedSelection}
-                    </p>
-                    <h2
-                      className={cn(
-                        "mt-1 text-2xl font-semibold text-slate-900 dark:text-white",
-                        language === "ar" && "text-right"
-                      )}
-                    >
-                      {category.localizedName}
-                    </h2>
-                    {category.localizedDescription && (
-                      <p
-                        className={cn(
-                          "text-sm text-slate-600 dark:text-slate-300",
-                          language === "ar" && "text-right"
-                        )}
-                      >
-                        {category.localizedDescription}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400",
-                      language === "ar" && "tracking-normal"
-                    )}
-                  >
-                    {category.items.length} {" "}
-                    {category.items.length === 1
-                      ? labels.itemsSingle
-                      : labels.itemsPlural}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid gap-4">
-                  {category.items.map((item) => {
-                    const primaryPrice = formatPrice(
-                      item.price,
-                      item.primary_currency,
-                      language
-                    );
-                    const secondaryPrice = formatPrice(
-                      item.secondary_price,
-                      item.secondary_currency,
-                      language
-                    );
-                    const itemName = getItemName(item);
-                    const itemDescription = getItemDescription(item);
-
-                    return (
-                      <article
-                        key={item.id}
-                        onClick={() => handleItemInteraction(item.id, category.id)}
-                        className="flex cursor-pointer flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:gap-6 sm:p-5"
-                      >
-                        <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800 sm:h-28 sm:w-28">
-                          {item.image_url ? (
-                            <Image
-                              src={item.image_url}
-                              alt={itemName}
-                              fill
-                              sizes="112px"
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400 dark:text-slate-500">
-                              {labels.noImage}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-1 flex-col gap-3">
-                          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <h3
-                                className={cn(
-                                  "text-lg font-semibold text-slate-900 dark:text-white",
-                                  language === "ar" && "text-right"
-                                )}
-                              >
-                                {itemName}
-                              </h3>
-                              {itemDescription && (
-                                <p
-                                  className={cn(
-                                    "text-sm text-slate-600 dark:text-slate-300",
-                                    language === "ar" && "text-right"
-                                  )}
-                                >
-                                  {itemDescription}
-                                </p>
-                              )}
-                            </div>
-                            <div
-                              className={cn(
-                                "text-base font-semibold text-slate-900 text-right dark:text-white",
-                                language === "ar" && "text-left"
-                              )}
-                            >
-                              {primaryPrice ?? "--"}
-                              {secondaryPrice && (
-                                <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                                  {secondaryPrice}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
-                            {renderTag(item, "is_new")}
-                            {renderTag(item, "is_popular")}
-                            {renderTag(item, "is_spicy")}
-                            {renderTag(item, "is_vegetarian")}
-                            {renderTag(item, "is_vegan")}
-                            {renderTag(item, "is_gluten_free")}
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+            {displayCategories.map(renderCategory)}
           </div>
         )}
       </main>
