@@ -31,6 +31,62 @@ const THEME_OPTIONS = [
   { id: "dark", label: "Dark" },
 ];
 
+type RgbColor = { r: number; g: number; b: number };
+
+const hexToRgb = (color: string): RgbColor | null => {
+  if (!color) return null;
+  const hex = color.trim().replace(/^#/, "");
+  if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return null;
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : hex;
+  const num = parseInt(normalized, 16);
+  return {
+    r: (num >> 16) & 0xff,
+    g: (num >> 8) & 0xff,
+    b: num & 0xff,
+  };
+};
+
+const rgbToHex = ({ r, g, b }: RgbColor) =>
+  `#${r.toString(16).padStart(2, "0")}${g
+    .toString(16)
+    .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+
+const getRelativeLuminance = (color: string) => {
+  const rgb = hexToRgb(color);
+  if (!rgb) return null;
+  const srgb = [rgb.r, rgb.g, rgb.b].map((channel) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+};
+
+const lightenHex = (color: string, factor = 0.6) => {
+  const rgb = hexToRgb(color);
+  if (!rgb) return color;
+  const lightenChannel = (value: number) =>
+    Math.min(255, Math.round(value + (255 - value) * factor));
+  return rgbToHex({
+    r: lightenChannel(rgb.r),
+    g: lightenChannel(rgb.g),
+    b: lightenChannel(rgb.b),
+  });
+};
+
+const ensureDarkThemeContrast = (color: string) => {
+  const luminance = getRelativeLuminance(color);
+  if (luminance !== null && luminance < 0.45) {
+    return lightenHex(color, 0.7);
+  }
+  return color;
+};
+
 export function BranchQrModal({
   open,
   onClose,
@@ -66,7 +122,9 @@ export function BranchQrModal({
 
   const accentColor = useMemo(() => {
     if (useBrandColor && restaurantPrimaryColor) {
-      return restaurantPrimaryColor;
+      return theme === "dark"
+        ? ensureDarkThemeContrast(restaurantPrimaryColor)
+        : restaurantPrimaryColor;
     }
     return theme === "dark" ? "#f8fafc" : "#0f172a";
   }, [theme, useBrandColor, restaurantPrimaryColor]);
@@ -133,8 +191,8 @@ export function BranchQrModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8">
       <div className="w-full max-w-5xl overflow-hidden rounded-3xl bg-card shadow-2xl">
-        <div className="flex flex-col gap-10 p-8 lg:flex-row">
-          <div className="flex-1">
+        <div className="flex flex-col gap-10 p-8 lg:grid lg:grid-cols-[minmax(0,1fr)_460px]">
+          <div className="w-full">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-slate-400">
@@ -158,13 +216,14 @@ export function BranchQrModal({
             Scan to view the menu directly. Recommended print size: 5x5 cm or larger.
           </p>
 
-            <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="flex-1 truncate text-sm text-slate-700">
+            <div className="mt-6 flex w-full min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex-1 min-w-0 truncate text-sm text-slate-700">
                 {shareUrl ?? "URL unavailable"}
               </div>
               <Button
                 size="sm"
                 variant="outline"
+                className="flex-shrink-0"
                 onClick={handleCopyLink}
                 disabled={!shareUrl}
               >
@@ -191,8 +250,8 @@ export function BranchQrModal({
                       className={cn(
                         "flex-1 rounded-2xl border px-3 py-2 text-sm transition",
                         destination === option.id
-                          ? "border-amber-600 bg-amber-500/10 text-amber-700"
-                          : "border-slate-200 text-slate-500 hover:border-slate-400"
+                          ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300"
                       )}
                     >
                       {option.label}
@@ -284,7 +343,7 @@ export function BranchQrModal({
             </div>
           </div>
 
-          <div className="flex w-full flex-col items-center justify-center gap-6 rounded-[32px] border border-border bg-muted/40 px-8 py-10 lg:w-[460px] lg:flex-shrink-0">
+          <div className="flex w-full flex-col items-center justify-center gap-6 rounded-[32px] border border-border bg-muted/40 px-8 py-10 lg:w-full">
             <div
               className="flex w-full items-center justify-center rounded-3xl p-6 shadow-inner"
               style={{
