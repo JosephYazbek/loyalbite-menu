@@ -360,7 +360,7 @@ export default async function AnalyticsPage({
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Insights
           </p>
-          <h1 className="text-3xl font-semibold text-foreground">Analytics</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
           <p className="text-sm text-muted-foreground">
             How customers interact with your menu.
           </p>
