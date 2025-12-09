@@ -45,10 +45,14 @@ export default async function CategoriesPage() {
     .order("created_at", { ascending: true });
 
   return (
-    <CategoriesClient
-      restaurantName={restaurant.name}
-      restaurantId={restaurantId}
-      initialCategories={(categories ?? []) as Category[]}
-    />
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
+        <CategoriesClient
+          restaurantName={restaurant.name}
+          restaurantId={restaurantId}
+          initialCategories={(categories ?? []) as Category[]}
+        />
+      </div>
+    </div>
   );
 }

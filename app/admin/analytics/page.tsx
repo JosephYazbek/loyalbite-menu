@@ -353,7 +353,8 @@ export default async function AnalyticsPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -554,6 +555,7 @@ export default async function AnalyticsPage({
             </table>
           )}
         </section>
+      </div>
       </div>
     </div>
   );

@@ -98,18 +98,19 @@ export default async function AdminHome() {
           : "Poor";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Dashboard
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-foreground">
-          Welcome back{restaurant?.name ? `, ${restaurant.name}` : ""}!
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Track menu health, recent engagement, and jump back into your tools.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Dashboard
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold text-foreground">
+            Welcome back{restaurant?.name ? `, ${restaurant.name}` : ""}!
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Track menu health, recent engagement, and jump back into your tools.
+          </p>
+        </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-3xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5">
@@ -178,35 +179,36 @@ export default async function AdminHome() {
         </section>
       </div>
 
-      <section className="rounded-3xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Quick actions
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {QUICK_ACTIONS.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="flex items-start gap-4 rounded-2xl border border-border/70 bg-background/50 p-4 transition hover:border-primary/60 hover:shadow-sm"
-              >
-                <span className="rounded-2xl bg-primary/10 p-3 text-primary">
-                  <Icon className="size-5" />
-                </span>
-                <div>
-                  <p className="text-base font-semibold text-foreground">
-                    {action.title}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {action.description}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+        <section className="rounded-3xl border border-border bg-card p-6 shadow-sm ring-1 ring-black/5">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Quick actions
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {QUICK_ACTIONS.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="flex items-start gap-4 rounded-2xl border border-border/70 bg-background/50 p-4 transition hover:border-primary/60 hover:shadow-sm"
+                >
+                  <span className="rounded-2xl bg-primary/10 p-3 text-primary">
+                    <Icon className="size-5" />
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-foreground">
+                      {action.title}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {action.description}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

@@ -128,7 +128,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
   return (
     <AdminWorkspaceContext.Provider value={contextValue}>
       <div className="admin-shell min-h-screen bg-background text-foreground transition-colors">
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen overflow-x-hidden">
           <aside className="hidden w-64 flex-shrink-0 flex-col border-r bg-card md:flex">
             <div className="sticky top-0 z-10 border-b bg-card px-6 py-6">
               <Link href="/" className="flex items-center gap-2 font-semibold">
@@ -159,7 +159,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
             </nav>
           </aside>
 
-          <div className="flex flex-1 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             <header className="sticky top-0 z-20 border-b bg-card/80 backdrop-blur">
               <div className="flex items-center gap-4 px-4 py-4 md:px-8">
                 <div className="flex flex-1 items-center gap-3">
@@ -224,7 +224,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
               </div>
             </header>
             <main className="flex-1 px-4 py-6 md:px-8 md:py-10 bg-background/60">
-              <div className="mx-auto max-w-6xl space-y-6">{children}</div>
+              <div className="min-w-0">{children}</div>
             </main>
           </div>
         </div>

@@ -54,7 +54,8 @@ export default async function ProfileSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
           Settings
@@ -67,28 +68,29 @@ export default async function ProfileSettingsPage() {
         </p>
       </div>
 
-      <ProfileForm
-        restaurant={{
-          id: restaurant.id,
-          name: restaurant.name,
-          slug: restaurant.slug,
-          logoUrl: restaurant.logo_url,
-          coverImageUrl: restaurant.cover_image_url,
-          descriptionEn: restaurant.description_en,
-          descriptionAr: restaurant.description_ar,
-          profileMeta: restaurant.description,
-          phone: restaurant.phone,
-          whatsappPhone: restaurant.whatsapp_phone,
-          email: restaurant.email,
-          website: restaurant.website,
-          primaryColor: restaurant.primary_color,
-          defaultLanguage: (restaurant.default_language as
-            | "en"
-            | "ar"
-            | "both"
-            | null) ?? "en",
-        }}
-      />
+        <ProfileForm
+          restaurant={{
+            id: restaurant.id,
+            name: restaurant.name,
+            slug: restaurant.slug,
+            logoUrl: restaurant.logo_url,
+            coverImageUrl: restaurant.cover_image_url,
+            descriptionEn: restaurant.description_en,
+            descriptionAr: restaurant.description_ar,
+            profileMeta: restaurant.description,
+            phone: restaurant.phone,
+            whatsappPhone: restaurant.whatsapp_phone,
+            email: restaurant.email,
+            website: restaurant.website,
+            primaryColor: restaurant.primary_color,
+            defaultLanguage: (restaurant.default_language as
+              | "en"
+              | "ar"
+              | "both"
+              | null) ?? "en",
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -66,13 +66,15 @@ export default async function BranchPricingPage({ params }: PageProps) {
     ]);
 
   return (
-    <div className="space-y-6">
-      <BranchPricingClient
-        branch={{ id: branch.id, name: branch.name }}
-        categories={(categories ?? []) as BranchPricingCategory[]}
-        items={(items ?? []) as BranchPricingItem[]}
-        overrides={(overrides ?? []) as BranchPricingOverride[]}
-      />
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
+        <BranchPricingClient
+          branch={{ id: branch.id, name: branch.name }}
+          categories={(categories ?? []) as BranchPricingCategory[]}
+          items={(items ?? []) as BranchPricingItem[]}
+          overrides={(overrides ?? []) as BranchPricingOverride[]}
+        />
+      </div>
     </div>
   );
 }

@@ -90,7 +90,8 @@ export default async function MenuHealthPage() {
   const scoreLabel = getScoreLabel(health.score);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Menu</p>
         <h1 className="text-3xl font-semibold text-foreground">Menu Health</h1>
@@ -224,54 +225,55 @@ export default async function MenuHealthPage() {
         )}
       </section>
 
-      <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Menu metrics</h2>
-            <p className="text-sm text-muted-foreground">
-              Key numbers behind your score.
-            </p>
+        <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Menu metrics</h2>
+              <p className="text-sm text-muted-foreground">
+                Key numbers behind your score.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MetricCard label="Total items" value={health.metrics.totalItems} />
-          <MetricCard
-            label="Items with photos"
-            value={`${health.metrics.itemsWithImage} (${Math.round(
-              (health.metrics.itemsWithImage / Math.max(health.metrics.totalItems, 1)) * 100
-            )}%)`}
-          />
-          <MetricCard
-            label="Items with descriptions"
-            value={`${health.metrics.itemsWithDescriptionEn} (${Math.round(
-              (health.metrics.itemsWithDescriptionEn / Math.max(health.metrics.totalItems, 1)) * 100
-            )}%)`}
-          />
-          <MetricCard
-            label="Items with Arabic content"
-            value={`${health.metrics.itemsWithDescriptionAr} (${Math.round(
-              (health.metrics.itemsWithDescriptionAr / Math.max(health.metrics.totalItems, 1)) * 100
-            )}%)`}
-          />
-          <MetricCard
-            label="Tagged items"
-            value={`${health.metrics.itemsWithAnyTag} (${Math.round(
-              (health.metrics.itemsWithAnyTag / Math.max(health.metrics.totalItems, 1)) * 100
-            )}%)`}
-          />
-          <MetricCard
-            label="Categories"
-            value={`${health.metrics.categories.length}`}
-            helper={
-              health.metrics.categories.length > 0
-                ? `${health.metrics.categories
-                    .map((category) => `${category.name_en ?? "Category"} (${category.itemCount})`)
-                    .join(", ")}`
-                : "No categories yet"
-            }
-          />
-        </div>
-      </section>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard label="Total items" value={health.metrics.totalItems} />
+            <MetricCard
+              label="Items with photos"
+              value={`${health.metrics.itemsWithImage} (${Math.round(
+                (health.metrics.itemsWithImage / Math.max(health.metrics.totalItems, 1)) * 100
+              )}%)`}
+            />
+            <MetricCard
+              label="Items with descriptions"
+              value={`${health.metrics.itemsWithDescriptionEn} (${Math.round(
+                (health.metrics.itemsWithDescriptionEn / Math.max(health.metrics.totalItems, 1)) * 100
+              )}%)`}
+            />
+            <MetricCard
+              label="Items with Arabic content"
+              value={`${health.metrics.itemsWithDescriptionAr} (${Math.round(
+                (health.metrics.itemsWithDescriptionAr / Math.max(health.metrics.totalItems, 1)) * 100
+              )}%)`}
+            />
+            <MetricCard
+              label="Tagged items"
+              value={`${health.metrics.itemsWithAnyTag} (${Math.round(
+                (health.metrics.itemsWithAnyTag / Math.max(health.metrics.totalItems, 1)) * 100
+              )}%)`}
+            />
+            <MetricCard
+              label="Categories"
+              value={`${health.metrics.categories.length}`}
+              helper={
+                health.metrics.categories.length > 0
+                  ? `${health.metrics.categories
+                      .map((category) => `${category.name_en ?? "Category"} (${category.itemCount})`)
+                      .join(", ")}`
+                  : "No categories yet"
+              }
+            />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
