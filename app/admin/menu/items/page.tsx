@@ -109,14 +109,16 @@ export default async function ItemsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <ItemsClient
-        categories={categories}
-        items={items}
-        branches={branches}
-        restaurantSlug={restaurantSlug}
-        restaurantDefaultLanguage={restaurantDefaultLanguage}
-      />
+    <div className="mx-auto w-full max-w-7xl px-6">
+      <div className="space-y-6">
+        <ItemsClient
+          categories={categories}
+          items={items}
+          branches={branches}
+          restaurantSlug={restaurantSlug}
+          restaurantDefaultLanguage={restaurantDefaultLanguage}
+        />
+      </div>
     </div>
   );
 }

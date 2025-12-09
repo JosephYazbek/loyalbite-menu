@@ -129,7 +129,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
     <AdminWorkspaceContext.Provider value={contextValue}>
       <div className="admin-shell min-h-screen bg-background text-foreground transition-colors">
         <div className="flex min-h-screen">
-          <aside className="hidden w-64 flex-col border-r bg-card md:flex">
+          <aside className="hidden w-64 flex-shrink-0 flex-col border-r bg-card md:flex">
             <div className="sticky top-0 z-10 border-b bg-card px-6 py-6">
               <Link href="/" className="flex items-center gap-2 font-semibold">
                 <UtensilsCrossed className="size-5 text-primary" />
