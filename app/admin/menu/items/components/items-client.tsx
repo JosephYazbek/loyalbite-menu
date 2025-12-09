@@ -440,7 +440,7 @@ export default function ItemsClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Menu
@@ -454,8 +454,8 @@ export default function ItemsClient({
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:gap-2">
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground min-w-0">
             <span className="text-xs font-medium uppercase tracking-wide">
               Branch
             </span>
@@ -474,39 +474,47 @@ export default function ItemsClient({
             </select>
           </div>
 
-          <Button asChild variant="outline">
-            <Link href="/admin/menu/categories">View Categories</Link>
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!previewUrl}
-            title={previewUrl ? undefined : "Select a branch first"}
-            asChild={Boolean(previewUrl)}
-          >
-            {previewUrl ? (
-              <a href={previewUrl} target="_blank" rel="noreferrer">
-                Preview Menu
-              </a>
-            ) : (
-              <span>Preview Menu</span>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!printMenuUrl}
-            asChild={Boolean(printMenuUrl)}
-          >
-            {printMenuUrl ? (
-              <a href={printMenuUrl} target="_blank" rel="noreferrer">
-                Print Menu
-              </a>
-            ) : (
-              <span>Print Menu</span>
-            )}
-          </Button>
-          <Button onClick={handleAddClick} disabled={!canInteract}>
-            + Add Item
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <Button asChild variant="outline" className="whitespace-nowrap">
+              <Link href="/admin/menu/categories">View Categories</Link>
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!previewUrl}
+              title={previewUrl ? undefined : "Select a branch first"}
+              asChild={Boolean(previewUrl)}
+              className="whitespace-nowrap"
+            >
+              {previewUrl ? (
+                <a href={previewUrl} target="_blank" rel="noreferrer">
+                  Preview Menu
+                </a>
+              ) : (
+                <span>Preview Menu</span>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!printMenuUrl}
+              asChild={Boolean(printMenuUrl)}
+              className="whitespace-nowrap"
+            >
+              {printMenuUrl ? (
+                <a href={printMenuUrl} target="_blank" rel="noreferrer">
+                  Print Menu
+                </a>
+              ) : (
+                <span>Print Menu</span>
+              )}
+            </Button>
+            <Button
+              onClick={handleAddClick}
+              disabled={!canInteract}
+              className="whitespace-nowrap"
+            >
+              + Add Item
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -523,8 +531,9 @@ export default function ItemsClient({
       </div>
 
       {/* Simple table view for now */}
-      <div className="rounded-2xl border border-border bg-card shadow-sm ring-1 ring-black/5 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-2xl border border-border bg-card shadow-sm ring-1 ring-black/5">
+        <div className="w-full overflow-x-auto">
+          <table className="min-w-max w-full table-auto text-sm">
           <thead className="border-b border-border bg-muted/60 text-muted-foreground">
             <tr>
               <th className="w-12 px-4 py-3" />
@@ -697,6 +706,7 @@ export default function ItemsClient({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <ItemModal
