@@ -355,8 +355,8 @@ export default async function AnalyticsPage({
   return (
     <div className="mx-auto w-full max-w-7xl px-6">
       <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Insights
           </p>
@@ -368,7 +368,9 @@ export default async function AnalyticsPage({
             Restaurant: {restaurant.name}
           </p>
         </div>
-        <RangeSelector value={rangeValue} />
+        <div className="flex flex-wrap items-center gap-3">
+          <RangeSelector value={rangeValue} />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

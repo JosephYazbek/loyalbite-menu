@@ -366,8 +366,8 @@ export function BranchesClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Operations
           </p>
@@ -380,8 +380,12 @@ export function BranchesClient() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <Button onClick={openCreateForm} size="lg" className="h-10 px-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={openCreateForm}
+            size="lg"
+            className="h-10 px-6 whitespace-nowrap"
+          >
             + Add Branch
           </Button>
         </div>
@@ -407,7 +411,7 @@ export function BranchesClient() {
             return (
               <div
                 key={branch.id}
-                className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5"
+                className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm ring-1 ring-black/5 min-w-0"
               >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -502,8 +506,8 @@ export function BranchesClient() {
                 </div>
               ) : null}
 
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" size="sm" asChild>
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" asChild className="whitespace-nowrap">
                   <Link href={`/admin/branches/${branch.id}/pricing`}>
                     Prices
                   </Link>
@@ -513,6 +517,7 @@ export function BranchesClient() {
                   size="sm"
                   onClick={() => openCloneModal(branch)}
                   disabled={branches.length <= 1}
+                  className="whitespace-nowrap"
                 >
                   Clone menu
                 </Button>
@@ -520,6 +525,7 @@ export function BranchesClient() {
                   variant="outline"
                   size="sm"
                   onClick={() => openEditForm(branch)}
+                  className="whitespace-nowrap"
                 >
                   Edit
                 </Button>
@@ -527,6 +533,7 @@ export function BranchesClient() {
                   variant="destructive"
                   size="sm"
                   onClick={() => handleDelete(branch)}
+                  className="whitespace-nowrap"
                 >
                   Delete
                 </Button>

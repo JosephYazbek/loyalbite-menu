@@ -269,8 +269,8 @@ export function CategoriesClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Menu
           </p>
@@ -280,11 +280,15 @@ export function CategoriesClient({
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <Button asChild variant="outline">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" className="whitespace-nowrap">
             <Link href="/admin/menu/items">View Items</Link>
           </Button>
-          <Button onClick={openCreate} disabled={!canInteract}>
+          <Button
+            onClick={openCreate}
+            disabled={!canInteract}
+            className="whitespace-nowrap"
+          >
             + Add Category
           </Button>
         </div>
@@ -301,125 +305,127 @@ export function CategoriesClient({
       </div>
 
       <div className="rounded-3xl border border-border bg-card shadow-sm ring-1 ring-black/5 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border/80 bg-secondary text-muted-foreground">
-            <tr>
-              <th className="w-12 px-4 py-3 text-left" />
-              <th className="px-4 py-3 text-left font-semibold">Category</th>
-              <th className="px-4 py-3 text-left font-semibold">Description</th>
-              <th className="px-4 py-3 text-left font-semibold">Flags</th>
-              <th className="px-4 py-3 text-right font-semibold">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {categories.length === 0 && (
+        <div className="w-full overflow-x-auto">
+          <table className="min-w-max w-full table-auto text-sm">
+            <thead className="border-b border-border/80 bg-secondary text-muted-foreground">
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center opacity-60">
-                  No categories yet.
-                </td>
+                <th className="w-12 px-4 py-3 text-left" />
+                <th className="px-4 py-3 text-left font-semibold">Category</th>
+                <th className="px-4 py-3 text-left font-semibold">Description</th>
+                <th className="px-4 py-3 text-left font-semibold">Flags</th>
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
               </tr>
-            )}
+            </thead>
 
-            {categories.map((cat) => {
-              const isDragging = draggingId === cat.id;
-              return (
-                <tr
-                  key={cat.id}
-                  draggable={canInteract}
-                  onDragStart={(event) => handleDragStart(event, cat.id)}
-                  onDragOver={handleDragOver}
-                  onDrop={(event) => handleDrop(event, cat.id)}
-                  onDragEnd={handleDragEnd}
-                  className={cn(
-                    "border-t border-border/60 bg-card hover:bg-secondary/40",
-                    isDragging && "bg-primary/5"
-                  )}
-                >
-                  <td className="px-4 py-3 align-middle">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition">
-                      <GripVertical className="h-4 w-4" />
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {cat.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={cat.image_url}
-                          alt={cat.name_en}
-                          className="h-10 w-10 rounded border object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded border border-border text-xs text-muted-foreground">
-                          <ImageIcon className="h-4 w-4" />
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-medium text-foreground">
-                          {cat.name_en}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Order #{cat.display_order}
-                        </div>
-                        {cat.is_offers && (
-                          <div className="text-xs font-semibold text-amber-600">
-                            Offers section
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    {cat.description_en || (
-                      <span className="opacity-40">&mdash;</span>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3 space-x-2">
-                    {cat.is_visible && <Badge>Visible</Badge>}
-                    {cat.is_offers && (
-                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                        Offers
-                      </Badge>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3 text-right space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEdit(cat)}
-                      disabled={!canInteract}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDuplicate(cat)}
-                      disabled={
-                        !canInteract || duplicatingCategoryId === cat.id
-                      }
-                    >
-                      Duplicate
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(cat.id)}
-                      disabled={!canInteract}
-                    >
-                      Delete
-                    </Button>
+            <tbody>
+              {categories.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center opacity-60">
+                    No categories yet.
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+
+              {categories.map((cat) => {
+                const isDragging = draggingId === cat.id;
+                return (
+                  <tr
+                    key={cat.id}
+                    draggable={canInteract}
+                    onDragStart={(event) => handleDragStart(event, cat.id)}
+                    onDragOver={handleDragOver}
+                    onDrop={(event) => handleDrop(event, cat.id)}
+                    onDragEnd={handleDragEnd}
+                    className={cn(
+                      "border-t border-border/60 bg-card hover:bg-secondary/40",
+                      isDragging && "bg-primary/5"
+                    )}
+                  >
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition">
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {cat.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={cat.image_url}
+                            alt={cat.name_en}
+                            className="h-10 w-10 rounded border object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded border border-border text-xs text-muted-foreground">
+                            <ImageIcon className="h-4 w-4" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium text-foreground">
+                            {cat.name_en}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Order #{cat.display_order}
+                          </div>
+                          {cat.is_offers && (
+                            <div className="text-xs font-semibold text-amber-600">
+                              Offers section
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {cat.description_en || (
+                        <span className="opacity-40">&mdash;</span>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3 space-x-2">
+                      {cat.is_visible && <Badge>Visible</Badge>}
+                      {cat.is_offers && (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                          Offers
+                        </Badge>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3 text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(cat)}
+                        disabled={!canInteract}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDuplicate(cat)}
+                        disabled={
+                          !canInteract || duplicatingCategoryId === cat.id
+                        }
+                      >
+                        Duplicate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDelete(cat.id)}
+                        disabled={!canInteract}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <CategoryModal

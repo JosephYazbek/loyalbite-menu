@@ -25,18 +25,18 @@ export function RangeSelector({ value }: RangeSelectorProps) {
   };
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1">
+    <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-border bg-card px-2 py-1">
       {ranges.map((range) => (
         <Button
           key={range.value}
           type="button"
           size="sm"
           variant={range.value === value ? "default" : "ghost"}
-          className={
+          className={`whitespace-nowrap ${
             range.value === value
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground"
-          }
+          }`}
           onClick={() => handleSelect(range.value as "7d" | "30d" | "all")}
         >
           {range.label}
