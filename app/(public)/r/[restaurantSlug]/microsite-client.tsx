@@ -24,12 +24,30 @@ type RestaurantProfileMeta = {
   socials?: Record<string, string | null>;
 };
 
+type OpeningHoursDay = {
+  open: string | null;
+  close: string | null;
+  closed: boolean;
+};
+
+type DayKey =
+  | "sunday"
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday";
+
+type OpeningHours = Record<DayKey, OpeningHoursDay>;
+
 type BranchPreview = {
   id: string;
   name: string | null;
   slug: string;
   address: string | null;
   isActive: boolean;
+  openingHours: OpeningHours | null;
 };
 
 type MicrositeClientProps = {
@@ -116,6 +134,64 @@ const LABELS = {
   },
 } as const;
 
+const HOURS_COPY = {
+  en: {
+    title: "Opening hours",
+    missing: "Hours coming soon.",
+    openNow: "Open now",
+    closedNow: "Closed",
+    closedLabel: "Closed",
+    until: "until",
+    opensAt: "Opens at",
+  },
+  ar: {
+    title: "ساعات العمل",
+    missing: "ساعات العمل ستتوفر قريبًا.",
+    openNow: "مفتوح الآن",
+    closedNow: "مغلق",
+    closedLabel: "مغلق",
+    until: "حتى",
+    opensAt: "يفتح عند",
+  },
+} as const;
+
+const DAY_LABELS: Record<SupportedLanguage, Record<DayKey, string>> = {
+  en: {
+    sunday: "Sunday",
+    monday: "Monday",
+    tuesday: "Tuesday",
+    wednesday: "Wednesday",
+    thursday: "Thursday",
+    friday: "Friday",
+    saturday: "Saturday",
+  },
+  ar: {
+    sunday: "الأحد",
+    monday: "الاثنين",
+    tuesday: "الثلاثاء",
+    wednesday: "الأربعاء",
+    thursday: "الخميس",
+    friday: "الجمعة",
+    saturday: "السبت",
+  },
+};
+
+const DAY_SEQUENCE: DayKey[] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+type BranchStatus = {
+  isOpen: boolean;
+  message: string;
+  todayKey: DayKey;
+};
+
 const sanitizeNumber = (value: string | null) =>
   value ? value.replace(/[^\d]/g, "") : null;
 
@@ -152,6 +228,113 @@ const darkenHex = (color: string, amount = 0.3) => {
   return `rgb(${r.toFixed(0)}, ${g.toFixed(0)}, ${b.toFixed(0)})`;
 };
 
+const parseMinutes = (value: string | null) => {
+  if (!value) return null;
+  const [hourString, minuteString] = value.split(":");
+  const hour = Number(hourString);
+  const minute = Number(minuteString);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+};
+
+const formatTimeForDisplay = (time: string | null) => {
+  if (!time) return "--";
+  const [hourString, minuteString = "00"] = time.split(":");
+  let hour = Number(hourString);
+  if (!Number.isFinite(hour)) return "--";
+  const suffix = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  return `${hour}:${minuteString} ${suffix}`;
+};
+
+const formatRange = (
+  day: OpeningHoursDay | undefined,
+  hoursLabels: (typeof HOURS_COPY)["en"]
+) => {
+  if (!day) return hoursLabels.missing;
+  if (day.closed) return hoursLabels.closedLabel;
+  if (!day.open || !day.close) return hoursLabels.missing;
+  return `${formatTimeForDisplay(day.open)} – ${formatTimeForDisplay(
+    day.close
+  )}`;
+};
+
+const computeBranchStatus = (
+  hours: OpeningHours | null,
+  now: Date,
+  hoursLabels: (typeof HOURS_COPY)["en"],
+  language: SupportedLanguage
+): BranchStatus => {
+  const todayIndex = now.getDay();
+  const todayKey = DAY_SEQUENCE[todayIndex];
+  if (!hours) {
+    return {
+      isOpen: false,
+      message: hoursLabels.missing,
+      todayKey,
+    };
+  }
+
+  const today = hours[todayKey];
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const start = parseMinutes(today?.open ?? null);
+  const end = parseMinutes(today?.close ?? null);
+
+  if (
+    today &&
+    !today.closed &&
+    start !== null &&
+    end !== null &&
+    nowMinutes >= start &&
+    nowMinutes < end
+  ) {
+    return {
+      isOpen: true,
+      message: `${hoursLabels.until} ${formatTimeForDisplay(today.close)}`,
+      todayKey,
+    };
+  }
+
+  if (
+    today &&
+    !today.closed &&
+    start !== null &&
+    nowMinutes < start &&
+    today.open
+  ) {
+    return {
+      isOpen: false,
+      message: `${hoursLabels.opensAt} ${formatTimeForDisplay(today.open)}`,
+      todayKey,
+    };
+  }
+
+  for (let offset = 1; offset < DAY_SEQUENCE.length; offset += 1) {
+    const nextKey = DAY_SEQUENCE[(todayIndex + offset) % DAY_SEQUENCE.length];
+    const nextDay = hours[nextKey];
+    if (
+      nextDay &&
+      !nextDay.closed &&
+      nextDay.open &&
+      parseMinutes(nextDay.open) !== null
+    ) {
+      return {
+        isOpen: false,
+        message: `${hoursLabels.opensAt} ${formatTimeForDisplay(
+          nextDay.open
+        )} (${DAY_LABELS[language][nextKey]})`,
+        todayKey,
+      };
+    }
+  }
+
+  return {
+    isOpen: false,
+    message: hoursLabels.closedLabel,
+    todayKey,
+  };
+};
+
 export default function MicrositeClient({
   restaurant,
   branches,
@@ -163,6 +346,12 @@ export default function MicrositeClient({
   const searchParams = useSearchParams();
   const [language, setLanguage] = useState<SupportedLanguage>(initialLanguage);
   const [viewLogged, setViewLogged] = useState(false);
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -210,6 +399,7 @@ export default function MicrositeClient({
   );
 
   const labels = LABELS[language];
+  const hoursLabels = HOURS_COPY[language];
 
   const localizedDescription =
     language === "ar"
@@ -275,6 +465,98 @@ export default function MicrositeClient({
       })),
     [restaurant.socials]
   );
+
+  const renderBranchCard = (branch: BranchPreview) => {
+    const status = computeBranchStatus(
+      branch.openingHours,
+      now,
+      hoursLabels,
+      language
+    );
+    return (
+      <div
+        key={branch.id}
+        className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60"
+      >
+        <p className="text-base font-semibold text-slate-900 dark:text-white">
+          {branch.name}
+        </p>
+        {branch.address && (
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            {branch.address}
+          </p>
+        )}
+
+        <div
+          className={cn(
+            "mt-3 inline-flex w-full flex-wrap items-center gap-2 rounded-2xl px-3 py-2 text-xs font-medium",
+            status.isOpen
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+              : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"
+          )}
+        >
+          <span className="inline-flex items-center gap-2">
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                status.isOpen ? "bg-emerald-500" : "bg-rose-500"
+              )}
+            />
+            {status.isOpen ? hoursLabels.openNow : hoursLabels.closedNow}
+          </span>
+          <span className="text-xs font-normal text-slate-600 dark:text-slate-300">
+            {status.message}
+          </span>
+        </div>
+
+        {branch.isActive ? (
+          <Link
+            href={`/m/${restaurant.slug}/${branch.slug}?lang=${language}`}
+            className="mt-3 inline-flex items-center text-xs font-semibold text-slate-900 hover:text-slate-600 dark:text-white dark:hover:text-slate-300"
+          >
+            {labels.branchMenu}
+            <span aria-hidden="true" className="ml-1">
+              →
+            </span>
+          </Link>
+        ) : (
+          <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+            {labels.missingBranch}
+          </p>
+        )}
+
+        {branch.openingHours ? (
+          <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/80 p-4 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300">
+            <div className="mb-2 text-xs font-semibold text-slate-900 dark:text-white">
+              {hoursLabels.title}
+            </div>
+            <div className="space-y-1">
+              {DAY_SEQUENCE.map((dayKey) => (
+                <div
+                  key={`${branch.id}-${dayKey}`}
+                  className={cn(
+                    "flex items-center justify-between",
+                    dayKey === status.todayKey
+                      ? "text-slate-900 dark:text-white font-semibold"
+                      : "text-slate-500 dark:text-slate-400"
+                  )}
+                >
+                  <span>{DAY_LABELS[language][dayKey]}</span>
+                  <span>
+                    {formatRange(branch.openingHours?.[dayKey], hoursLabels)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+            {hoursLabels.missing}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -372,36 +654,7 @@ export default function MicrositeClient({
                     : "No active branches yet."}
                 </p>
               ) : (
-                branches.map((branch) => (
-                  <div
-                    key={branch.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60"
-                  >
-                    <p className="text-base font-semibold text-slate-900 dark:text-white">
-                      {branch.name}
-                    </p>
-                    {branch.address && (
-                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        {branch.address}
-                      </p>
-                    )}
-                    {branch.isActive ? (
-                      <Link
-                        href={`/m/${restaurant.slug}/${branch.slug}?lang=${language}`}
-                        className="mt-3 inline-flex items-center text-xs font-semibold text-slate-900 hover:text-slate-600 dark:text-white dark:hover:text-slate-300"
-                      >
-                        {labels.branchMenu}
-                        <span aria-hidden="true" className="ml-1">
-                          →
-                        </span>
-                      </Link>
-                    ) : (
-                      <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                        {labels.missingBranch}
-                      </p>
-                    )}
-                  </div>
-                ))
+                branches.map((branch) => renderBranchCard(branch))
               )}
             </div>
           </div>

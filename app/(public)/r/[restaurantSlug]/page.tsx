@@ -57,13 +57,28 @@ export default async function RestaurantMicrositePage({
 
   const { data: branchesData, error: branchesError } = await supabase
     .from("branches")
-    .select("id, name, slug, address, is_active, created_at")
+    .select("id, name, slug, address, is_active, opening_hours, created_at")
     .eq("restaurant_id", restaurant.id)
     .order("name", { ascending: true });
 
   if (branchesError) {
     console.error("[microsite] branches load error", branchesError);
   }
+
+  type OpeningHoursRow = Record<
+    | "sunday"
+    | "monday"
+    | "tuesday"
+    | "wednesday"
+    | "thursday"
+    | "friday"
+    | "saturday",
+    {
+      open: string | null;
+      close: string | null;
+      closed: boolean;
+    }
+  >;
 
   const branches =
     branchesData?.map((branch) => ({
@@ -72,6 +87,7 @@ export default async function RestaurantMicrositePage({
       slug: branch.slug,
       address: branch.address,
       isActive: branch.is_active !== false,
+      openingHours: (branch.opening_hours as OpeningHoursRow | null) ?? null,
     })) ?? [];
 
   const activeBranch =
