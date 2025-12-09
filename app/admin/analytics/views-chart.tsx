@@ -46,7 +46,7 @@ export function ViewsChart({ data }: ViewsChartProps) {
           <Line
             type="monotone"
             dataKey="count"
-            stroke="#0f172b"
+            stroke="var(--analytics-line, #0f172b)"
             strokeWidth={3}
             dot={false}
           />

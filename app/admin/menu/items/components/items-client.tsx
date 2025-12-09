@@ -445,9 +445,9 @@ export default function ItemsClient({
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Menu
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Menu Items
-          </h2>
+          </h1>
           <p className="text-sm text-muted-foreground">
             Manage names, pricing, tags, and branch previews from a single
             place.

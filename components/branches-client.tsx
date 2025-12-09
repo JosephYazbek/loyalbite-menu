@@ -371,7 +371,7 @@ export function BranchesClient() {
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
             Operations
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Branches
           </h1>
           <p className="text-sm text-muted-foreground">

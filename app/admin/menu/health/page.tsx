@@ -94,7 +94,7 @@ export default async function MenuHealthPage() {
       <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Menu</p>
-        <h1 className="text-3xl font-semibold text-foreground">Menu Health</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Menu Health</h1>
         <p className="text-sm text-muted-foreground">
           How complete and effective your menu is.
         </p>

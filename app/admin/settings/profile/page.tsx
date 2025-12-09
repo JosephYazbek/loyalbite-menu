@@ -60,7 +60,7 @@ export default async function ProfileSettingsPage() {
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
           Settings
         </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold text-foreground">
           Restaurant profile & branding
         </h1>
         <p className="text-sm text-muted-foreground">
