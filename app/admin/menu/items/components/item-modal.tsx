@@ -34,6 +34,7 @@ export type ItemFormValues = {
   secondary_price: string | number | null;
   primary_currency: string;
   secondary_currency: string;
+  calories: string | number | null;
 
   image_url: string;
 
@@ -61,6 +62,7 @@ const EMPTY_VALUES: ItemFormValues = {
   secondary_price: "",
   primary_currency: "USD",
   secondary_currency: "",
+  calories: "",
   image_url: "",
   is_new: false,
   is_popular: false,
@@ -276,6 +278,14 @@ export default function ItemModal({
       return;
     }
 
+    if (values.calories !== "" && values.calories !== null) {
+      const parsedCalories = Number(values.calories);
+      if (!Number.isFinite(parsedCalories) || parsedCalories < 0) {
+        alert("Calories must be a positive number.");
+        return;
+      }
+    }
+
     await onSubmit(values, {
       file: selectedFile,
       removeExistingImage,
@@ -307,7 +317,7 @@ export default function ItemModal({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Category + Status */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="category_id">Category</Label>
               <select
@@ -426,6 +436,20 @@ export default function ItemModal({
                 value={values.price}
                 onChange={handleChange("price")}
                 placeholder="10.00"
+                disabled={disableInteractions}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="calories">Calories (optional)</Label>
+              <Input
+                id="calories"
+                type="number"
+                min="0"
+                step="1"
+                value={values.calories ?? ""}
+                onChange={handleChange("calories")}
+                placeholder="e.g. 450"
                 disabled={disableInteractions}
               />
             </div>

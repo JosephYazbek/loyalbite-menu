@@ -275,6 +275,10 @@ export default function ItemsClient({
           : null,
         primary_currency: values.primary_currency || "USD",
         secondary_currency: values.secondary_currency || null,
+        calories:
+          values.calories !== "" && values.calories !== null
+            ? Number(values.calories)
+            : null,
         image_url: values.image_url || null,
         is_new: values.is_new,
         is_popular: values.is_popular,
@@ -424,6 +428,7 @@ export default function ItemsClient({
           secondary_price: editingItem.secondary_price ?? "",
           primary_currency: editingItem.primary_currency || "USD",
           secondary_currency: editingItem.secondary_currency || "",
+          calories: editingItem.calories ?? "",
           image_url: editingItem.image_url || "",
           is_new: !!editingItem.is_new,
           is_popular: !!editingItem.is_popular,
@@ -625,6 +630,11 @@ export default function ItemsClient({
                     {item.secondary_price != null && (
                       <div className="text-xs text-gray-500">
                         {item.secondary_price} {item.secondary_currency || ""}
+                      </div>
+                    )}
+                    {item.calories != null && (
+                      <div className="text-xs text-gray-500">
+                        {item.calories} kcal
                       </div>
                     )}
                   </td>

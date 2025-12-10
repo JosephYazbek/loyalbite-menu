@@ -1,5 +1,5 @@
 // app/admin/menu/items/page.tsx
-
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { normalizeBranchSlugs } from "@/lib/branch-slug";
 import ItemsClient from "./components/items-client";
@@ -14,99 +14,115 @@ type BranchRecord = {
 export default async function ItemsPage() {
   const supabase = await createSupabaseServerClient();
 
-  const { data: categoriesData } = await supabase
-    .from("categories")
-    .select(
-      `
-      id,
-      restaurant_id,
-      name_en,
-      name_ar,
-      description_en,
-      description_ar,
-      is_visible,
-      is_offers,
-      display_order
-    `
-    )
-    .order("display_order", { ascending: true });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data: itemsData } = await supabase
-    .from("items")
-    .select(
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: membership } = await supabase
+    .from("restaurant_users")
+    .select("restaurant_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership?.restaurant_id) {
+    redirect("/onboarding");
+  }
+
+  const restaurantId = membership.restaurant_id;
+
+  const [{ data: categoriesData }, { data: itemsData }] = await Promise.all([
+    supabase
+      .from("categories")
+      .select(
+        `
+        id,
+        restaurant_id,
+        name_en,
+        name_ar,
+        description_en,
+        description_ar,
+        is_visible,
+        is_offers,
+        display_order
       `
-      id,
-      restaurant_id,
-      category_id,
-      name_en,
-      name_ar,
-      description_en,
-      description_ar,
-      price,
-      secondary_price,
-      primary_currency,
-      secondary_currency,
-      image_url,
-      is_new,
-      is_popular,
-      is_spicy,
-      is_vegetarian,
-      is_vegan,
-      is_gluten_free,
-      is_visible,
-      is_available,
-      item_code,
-      display_order,
-      created_at,
-      updated_at
-    `
-    )
-    .order("display_order", { ascending: true });
+      )
+      .eq("restaurant_id", restaurantId)
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("items")
+      .select(
+        `
+        id,
+        restaurant_id,
+        category_id,
+        name_en,
+        name_ar,
+        description_en,
+        description_ar,
+        price,
+        secondary_price,
+        primary_currency,
+        secondary_currency,
+        calories,
+        image_url,
+        is_new,
+        is_popular,
+        is_spicy,
+        is_vegetarian,
+        is_vegan,
+        is_gluten_free,
+        is_visible,
+        is_available,
+        item_code,
+        display_order,
+        created_at,
+        updated_at
+      `
+      )
+      .eq("restaurant_id", restaurantId)
+      .order("display_order", { ascending: true }),
+  ]);
 
   const categories = categoriesData ?? [];
   const items = itemsData ?? [];
 
-  const inferredRestaurantId =
-    categories[0]?.restaurant_id ?? items[0]?.restaurant_id ?? null;
+  const [{ data: restaurantRecord }, { data: branchData }] = await Promise.all([
+    supabase
+      .from("restaurants")
+      .select("slug, default_language")
+      .eq("id", restaurantId)
+      .maybeSingle(),
+    supabase
+      .from("branches")
+      .select("id, name, slug, is_active")
+      .eq("restaurant_id", restaurantId)
+      .order("name", { ascending: true }),
+  ]);
 
-  let restaurantSlug: string | null = null;
-  let branches: BranchRecord[] = [];
-  let restaurantDefaultLanguage: "en" | "ar" | "both" | null = "en";
+  const restaurantSlug = restaurantRecord?.slug ?? null;
+  const restaurantDefaultLanguage =
+    (restaurantRecord?.default_language as "en" | "ar" | "both" | null) ?? "en";
 
-  if (inferredRestaurantId) {
-    const [{ data: restaurantRecord }, { data: branchData }] = await Promise.all([
-      supabase
-        .from("restaurants")
-        .select("slug, default_language")
-        .eq("id", inferredRestaurantId)
-        .maybeSingle(),
-      supabase
-        .from("branches")
-        .select("id, name, slug, is_active")
-        .eq("restaurant_id", inferredRestaurantId)
-        .order("name", { ascending: true }),
-    ]);
+  const normalizedBranchRows = await normalizeBranchSlugs(
+    supabase,
+    (branchData ?? []) as Array<{
+      id: string;
+      name: string | null;
+      slug: string | null;
+    }>
+  );
 
-    restaurantSlug = restaurantRecord?.slug ?? null;
-    restaurantDefaultLanguage =
-      (restaurantRecord?.default_language as "en" | "ar" | "both" | null) ?? "en";
-
-    const normalizedBranchRows = await normalizeBranchSlugs(
-      supabase,
-      (branchData ?? []) as Array<{
-        id: string;
-        name: string | null;
-        slug: string | null;
-      }>
-    );
-
-    branches = normalizedBranchRows.map((branch) => ({
-      id: branch.id,
-      name: branch.name,
-      slug: branch.slug ?? "",
-      is_active: branch.is_active ?? true,
-    }));
-  }
+  const branches: BranchRecord[] = normalizedBranchRows.map((branch) => ({
+    id: branch.id,
+    name: branch.name,
+    slug: branch.slug ?? "",
+    is_active: branch.is_active ?? true,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6">

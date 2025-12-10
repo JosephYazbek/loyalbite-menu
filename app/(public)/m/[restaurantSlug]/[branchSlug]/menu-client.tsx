@@ -23,6 +23,7 @@ type ItemRecord = {
   primary_currency: string | null;
   secondary_currency: string | null;
   image_url: string | null;
+  calories: number | string | null;
   is_new: boolean | null;
   is_popular: boolean | null;
   is_spicy: boolean | null;
@@ -339,6 +340,10 @@ export function MenuClient({
       item.secondary_currency,
       language
     );
+    const caloriesText =
+      item.calories !== null && item.calories !== undefined && item.calories !== ""
+        ? `${item.calories} kcal`
+        : null;
 
     return (
       <article
@@ -394,6 +399,11 @@ export function MenuClient({
               {secondaryPrice && (
                 <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
                   {secondaryPrice}
+                </p>
+              )}
+              {caloriesText && (
+                <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {caloriesText}
                 </p>
               )}
             </div>

@@ -41,6 +41,7 @@ type ItemRecord = {
   primary_currency: string | null;
   secondary_currency: string | null;
   image_url: string | null;
+  calories: number | string | null;
   is_new: boolean | null;
   is_popular: boolean | null;
   is_spicy: boolean | null;
@@ -140,6 +141,7 @@ export default async function BranchPublicMenuPage({
             "secondary_price",
             "primary_currency",
             "secondary_currency",
+            "calories",
             "image_url",
             "is_new",
             "is_popular",

@@ -49,6 +49,10 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   const safeMemberships: MembershipRecord[] =
     (memberships as unknown as MembershipRecord[]) ?? [];
 
+  if (safeMemberships.length === 0) {
+    redirect("/onboarding");
+  }
+
   return (
     <AdminShell
       user={{

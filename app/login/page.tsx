@@ -26,6 +26,9 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const successStatus = searchParams?.get("success") === "password_updated";
+  const redirectPath = searchParams?.get("redirect") ?? null;
+  const safeRedirectPath =
+    redirectPath && redirectPath.startsWith("/") ? redirectPath : null;
 
   useEffect(() => {
     try {
@@ -122,7 +125,7 @@ export default function LoginPage() {
         }
 
         if (data.session) {
-          router.push("/admin");
+          router.push(safeRedirectPath ?? "/onboarding");
         } else {
           setMessage("Check your inbox to verify your email before signing in.");
         }
@@ -140,7 +143,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/admin");
+      router.push(safeRedirectPath ?? "/admin");
     } finally {
       setLoading(false);
     }
@@ -151,7 +154,9 @@ export default function LoginPage() {
     try {
       const redirectTo =
         typeof window !== "undefined"
-          ? `${window.location.origin}/admin`
+          ? `${window.location.origin}${
+              safeRedirectPath ?? "/admin"
+            }`
           : undefined;
       await supabaseBrowser.auth.signInWithOAuth({
         provider: "google",

@@ -100,7 +100,7 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
 
   const handleLogout = async () => {
     await supabaseBrowser.auth.signOut()
-    router.replace("/admin/login")
+    router.replace("/login")
   }
 
   if (!memberships.length) {
