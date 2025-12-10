@@ -1,9 +1,5 @@
+import { redirect } from "next/navigation";
+
 export default function Home() {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-      <h1 className="text-3xl font-bold">
-        LoyalBite Menu – dev setup OK ✅
-      </h1>
-    </main>
-  );
+  redirect("/login");
 }
