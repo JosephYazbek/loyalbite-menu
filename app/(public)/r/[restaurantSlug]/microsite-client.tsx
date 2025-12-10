@@ -121,27 +121,39 @@ const LABELS = {
   },
   ar: {
     viewMenu: "عرض القائمة",
-    contact: "تواصل عبر واتساب",
+    contact: "التواصل عبر واتساب",
     phone: "الهاتف",
     whatsapp: "واتساب",
-    email: "البريد",
-    website: "الموقع",
+    email: "البريد الإلكتروني",
+    website: "الموقع الإلكتروني",
     branchesTitle: "الفروع",
-    contactTitle: "تواصل",
-    socialsTitle: "التواصل الاجتماعي",
+    contactTitle: "التواصل",
+    socialsTitle: "حسابات التواصل",
     branchMenu: "عرض القائمة",
-    missingBranch: "القائمة قريباً",
+    missingBranch: "القائمة قيد التحضير",
   },
 } as const;
 
-const HOURS_COPY = {
+
+
+type HoursLabels = {
+  title: string;
+  missing: string;
+  openNow: string;
+  closedNow: string;
+  closedLabel: string;
+  until: string;
+  opensAt: string;
+};
+
+const HOURS_COPY: Record<SupportedLanguage, HoursLabels> = {
   en: {
     title: "Opening hours",
     missing: "Hours coming soon.",
     openNow: "Open now",
     closedNow: "Closed",
     closedLabel: "Closed",
-    until: "until",
+    until: "Open until",
     opensAt: "Opens at",
   },
   ar: {
@@ -150,10 +162,10 @@ const HOURS_COPY = {
     openNow: "مفتوح الآن",
     closedNow: "مغلق",
     closedLabel: "مغلق",
-    until: "حتى",
+    until: "مفتوح حتى",
     opensAt: "يفتح عند",
   },
-} as const;
+};
 
 const DAY_LABELS: Record<SupportedLanguage, Record<DayKey, string>> = {
   en: {
@@ -249,12 +261,12 @@ const formatTimeForDisplay = (time: string | null) => {
 
 const formatRange = (
   day: OpeningHoursDay | undefined,
-  hoursLabels: (typeof HOURS_COPY)["en"]
+  hoursLabels: HoursLabels
 ) => {
   if (!day) return hoursLabels.missing;
   if (day.closed) return hoursLabels.closedLabel;
   if (!day.open || !day.close) return hoursLabels.missing;
-  return `${formatTimeForDisplay(day.open)} – ${formatTimeForDisplay(
+  return `${formatTimeForDisplay(day.open)} - ${formatTimeForDisplay(
     day.close
   )}`;
 };
@@ -262,7 +274,7 @@ const formatRange = (
 const computeBranchStatus = (
   hours: OpeningHours | null,
   now: Date,
-  hoursLabels: (typeof HOURS_COPY)["en"],
+  hoursLabels: HoursLabels,
   language: SupportedLanguage
 ): BranchStatus => {
   const todayIndex = now.getDay();
@@ -623,12 +635,7 @@ export default function MicrositeClient({
               </span>
             )}
             {whatsappUrl ? (
-              <button
-                type="button"
-                onClick={handleWhatsApp}
-                // className="flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-white text-[#25d366] shadow-lg transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                // aria-label={labels.contact}
-              >
+              <button type="button" onClick={handleWhatsApp}>
                 <WhatsAppLogo className="h-13 w-13" />
                 <span className="sr-only">{labels.contact}</span>
               </button>
@@ -752,3 +759,8 @@ export default function MicrositeClient({
     </div>
   );
 }
+
+
+
+
+
