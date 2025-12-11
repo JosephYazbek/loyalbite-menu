@@ -48,6 +48,9 @@ type ItemRecord = {
   is_vegetarian: boolean | null;
   is_vegan: boolean | null;
   is_gluten_free: boolean | null;
+  is_available: boolean | null;
+  is_visible: boolean | null;
+  diet_category: string | null;
   display_order: number | null;
 };
 
@@ -149,6 +152,9 @@ export default async function BranchPublicMenuPage({
             "is_vegetarian",
             "is_vegan",
             "is_gluten_free",
+            "is_available",
+            "is_visible",
+            "diet_category",
             "display_order",
           ].join(", ")
         )
@@ -209,23 +215,20 @@ export default async function BranchPublicMenuPage({
       items: (itemsByCategory.get(category.id) ?? [])
         .map((item) => {
           const override = overridesMap.get(item.id);
-          const effectiveAvailability = override?.is_available ?? item.is_available;
-          if (effectiveAvailability === false) {
-            return null;
-          }
-
+          const effectiveAvailability =
+            override?.is_available ?? (item.is_available ?? true);
           const effectivePrice = override?.price ?? item.price;
           return {
             ...item,
             price: effectivePrice,
             secondary_price:
               override?.secondary_price ??
-              item.secondary_price ??
-              convertSecondary(effectivePrice),
+                item.secondary_price ??
+                convertSecondary(effectivePrice),
             display_order: override?.display_order ?? item.display_order,
+            is_available: effectiveAvailability,
           };
         })
-        .filter((item): item is ItemRecord => Boolean(item))
         .sort(
           (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
         ),

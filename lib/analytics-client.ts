@@ -12,7 +12,9 @@ export type AnalyticsEventPayload = {
     | "whatsapp_click"
     | "microsite_view"
     | "microsite_to_menu_click"
-    | "menu_print_view";
+    | "menu_print_view"
+    | "menu_search"
+    | "menu_filter";
   language?: "en" | "ar";
 };
 

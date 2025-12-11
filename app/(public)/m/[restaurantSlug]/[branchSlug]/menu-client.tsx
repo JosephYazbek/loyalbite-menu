@@ -1,13 +1,17 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { JSX } from "react";
+import type { JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Search, X } from "lucide-react";
 import { logAnalyticsEvent } from "@/lib/analytics-client";
 import { cn } from "@/lib/utils";
 import { SupportedLanguage } from "@/lib/language";
 import { WhatsAppLogo } from "@/components/whatsapp-logo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 type MenuLanguage = SupportedLanguage;
 
@@ -30,6 +34,9 @@ type ItemRecord = {
   is_vegetarian: boolean | null;
   is_vegan: boolean | null;
   is_gluten_free: boolean | null;
+  is_available: boolean | null;
+  is_visible: boolean | null;
+  diet_category: string | null;
 };
 
 type CategoryWithItems = {
@@ -41,6 +48,11 @@ type CategoryWithItems = {
   is_offers?: boolean | null;
   is_visible?: boolean | null;
   items: ItemRecord[];
+};
+
+type LocalizedCategory = CategoryWithItems & {
+  localizedName: string;
+  localizedDescription: string;
 };
 
 type MenuClientProps = {
@@ -76,9 +88,20 @@ const UI_TEXT = {
     languageLabel: "Language",
     branchLabel: "Branch",
     jumpToCategory: "Jump to category",
+    filterTitle: "Find dishes fast",
+    quickFilters: "Quick filters",
+    searchPlaceholder: "Search dishes...",
+    clearFilters: "Clear filters",
+    availableToggle: "Available only",
+    offersToggle: "Offers only",
+    maxCaloriesLabel: "Max calories",
+    maxCaloriesPlaceholder: "e.g. 600",
+    dietLabel: "Category",
+    dietPlaceholder: "All categories",
     itemsSingle: "item",
     itemsPlural: "items",
     updatingMessage: "This menu is being updated. Please check back soon.",
+    noMatches: "No dishes match your filters. Try adjusting search or filters.",
     noImage: "No image",
     footer: "Powered by LoyalBite - crafted for premium dining experiences.",
     heroDescriptionFallback: "Discover our latest dishes and favorites.",
@@ -87,13 +110,24 @@ const UI_TEXT = {
   ar: {
     languageLabel: "اللغة",
     branchLabel: "الفرع",
-    jumpToCategory: "انتقل إلى الفئة",
-    itemsSingle: "عنصر",
-    itemsPlural: "عناصر",
-    updatingMessage: "يتم تحديث هذه القائمة. يرجى التحقق لاحقاً.",
+    jumpToCategory: "انتقل إلى فئة",
+    filterTitle: "ابحث عن الأطباق بسرعة",
+    quickFilters: "مرشحات سريعة",
+    searchPlaceholder: "ابحث عن طبق...",
+    clearFilters: "إعادة التصفية",
+    availableToggle: "الأصناف المتاحة فقط",
+    offersToggle: "العروض فقط",
+    maxCaloriesLabel: "الحد الأقصى للسعرات",
+    maxCaloriesPlaceholder: "مثال: 600",
+    dietLabel: "الفئة",
+    dietPlaceholder: "كل الفئات",
+    itemsSingle: "طبق",
+    itemsPlural: "أطباق",
+    updatingMessage: "يتم تحديث هذه القائمة. يرجى التحقق لاحقًا.",
+    noMatches: "لا توجد أطباق مطابقة. جرّب تعديل البحث أو المرشحات.",
     noImage: "لا توجد صورة",
-    footer: "منصة LoyalBite - تجربة طعام مميزة.",
-    heroDescriptionFallback: "اكتشف أحدث الأطباق وأشهر الأصناف لدينا.",
+    footer: "مدعوم من LoyalBite - صُمم لتجارب طعام فاخرة.",
+    heroDescriptionFallback: "اكتشف أحدث أطباقنا والمفضلة لدينا.",
     whatsappCta: "تواصل عبر واتساب",
   },
 } as const;
@@ -125,6 +159,25 @@ const TAG_STYLES: Record<keyof typeof TAG_LABELS.en, string> = {
   is_vegan: "bg-emerald-100 text-emerald-700",
   is_gluten_free: "bg-blue-100 text-blue-700",
 };
+
+const FILTER_PILLS = [
+  { key: "offers", label: { en: "Offers", ar: "العروض" } },
+  { key: "is_new", label: { en: "New", ar: "جديد" } },
+  { key: "is_popular", label: { en: "Popular", ar: "شعبي" } },
+  { key: "is_spicy", label: { en: "Spicy", ar: "حار" } },
+  { key: "is_vegetarian", label: { en: "Veg", ar: "نباتي" } },
+  { key: "is_vegan", label: { en: "Vegan", ar: "نباتي صارم" } },
+  { key: "is_gluten_free", label: { en: "Gluten-free", ar: "خالٍ من الغلوتين" } },
+] as const;
+
+type FilterPillKey = (typeof FILTER_PILLS)[number]["key"];
+
+const normalizeForSearch = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
 const formatPrice = (
   value: number | string | null | undefined,
@@ -161,6 +214,15 @@ export function MenuClient({
   const menuLoggedRef = useRef(false);
   const viewedCategoriesRef = useRef<Set<string>>(new Set());
   const viewedItemsRef = useRef<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedPills, setSelectedPills] = useState<FilterPillKey[]>([]);
+  const [availableOnly, setAvailableOnly] = useState(false);
+  const [offersOnly, setOffersOnly] = useState(false);
+  const [maxCalories, setMaxCalories] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const lastLoggedSearchRef = useRef("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -248,9 +310,123 @@ export function MenuClient({
     [restaurant.id, branch.id]
   );
 
+  const logFilterEvent = useCallback(() => {
+    logAnalyticsEvent({
+      restaurantId: restaurant.id,
+      branchId: branch.id,
+      eventType: "menu_filter",
+      language: languageRef.current,
+    });
+  }, [restaurant.id, branch.id]);
+
+  const logSearchEvent = useCallback(
+    (term: string) => {
+      const trimmed = term.trim();
+      if (!trimmed) return;
+      if (lastLoggedSearchRef.current === trimmed) return;
+      lastLoggedSearchRef.current = trimmed;
+      logAnalyticsEvent({
+        restaurantId: restaurant.id,
+        branchId: branch.id,
+        eventType: "menu_search",
+        language: languageRef.current,
+      });
+    },
+    [restaurant.id, branch.id]
+  );
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!debouncedSearch) return;
+    logSearchEvent(debouncedSearch);
+  }, [debouncedSearch, logSearchEvent]);
+
+  const handleSearchBlur = () => {
+    if (!searchTerm.trim()) return;
+    logSearchEvent(searchTerm);
+  };
+
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      logSearchEvent(searchTerm);
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setSelectedPills([]);
+    setAvailableOnly(false);
+    setOffersOnly(false);
+    setMaxCalories("");
+    setCategoryFilter("");
+    lastLoggedSearchRef.current = "";
+    logFilterEvent();
+  };
+
+  const handleSearchClear = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    lastLoggedSearchRef.current = "";
+  };
+
+  const handlePillToggle = (key: FilterPillKey) => {
+    setSelectedPills((prev) => {
+      if (prev.includes(key)) {
+        return prev.filter((pill) => pill !== key);
+      }
+      return [...prev, key];
+    });
+    logFilterEvent();
+  };
+
+  const handleAvailableToggle = (next: boolean) => {
+    setAvailableOnly(next);
+    logFilterEvent();
+  };
+
+  const handleOffersToggle = (next: boolean) => {
+    setOffersOnly(next);
+    logFilterEvent();
+  };
+
+  const handleCaloriesChange = (value: string) => {
+    setMaxCalories(value);
+    logFilterEvent();
+  };
+
+  const handleDietChange = (value: string) => {
+    setCategoryFilter(value);
+    logFilterEvent();
+  };
+
   const resolvedAccent = restaurant.primary_color?.trim() || accentColor;
   const labels = UI_TEXT[language];
   const offersLabel = language === "ar" ? "عروض اليوم" : "TODAY'S OFFERS";
+  const caloriesLimit = useMemo(() => {
+    if (!maxCalories.trim()) return null;
+    const parsed = Number(maxCalories);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }, [maxCalories]);
+  const filtersActive =
+    Boolean(searchTerm.trim()) ||
+    selectedPills.length > 0 ||
+    availableOnly ||
+    offersOnly ||
+    caloriesLimit !== null ||
+    Boolean(categoryFilter);
+
+  useEffect(() => {
+    if (filtersActive) {
+      setFiltersOpen(true);
+    }
+  }, [filtersActive]);
 
   const heroDescription =
     (
@@ -299,7 +475,7 @@ export function MenuClient({
     return [...offers, ...regular];
   }, [categories]);
 
-  const displayCategories = useMemo(() => {
+  const localizedCategories = useMemo<LocalizedCategory[]>(() => {
     return sortedCategories.map((category) => {
       const localizedName =
         language === "ar"
@@ -316,6 +492,103 @@ export function MenuClient({
       };
     });
   }, [sortedCategories, language]);
+
+  const categoryOptions = useMemo(
+    () =>
+      localizedCategories.map((category) => ({
+        value: category.id,
+        label: category.localizedName,
+      })),
+    [localizedCategories]
+  );
+
+  const filteredCategories = useMemo<LocalizedCategory[]>(() => {
+    const normalizedSearch = normalizeForSearch(debouncedSearch);
+    const hasSearch = Boolean(normalizedSearch);
+    return localizedCategories
+      .map((category) => {
+        if (offersOnly && !category.is_offers) {
+          return null;
+        }
+        if (categoryFilter && category.id !== categoryFilter) {
+          return null;
+        }
+        const filteredItems = category.items.filter((item) => {
+          if (item.is_visible === false) return false;
+          if (availableOnly && item.is_available === false) return false;
+
+          if (selectedPills.length) {
+            const matches = selectedPills.some((pill) => {
+              if (pill === "offers") {
+                return Boolean(category.is_offers);
+              }
+              const field = pill as Exclude<FilterPillKey, "offers">;
+              return Boolean(item[field as keyof ItemRecord]);
+            });
+            if (!matches) {
+              return false;
+            }
+          }
+
+          if (caloriesLimit !== null) {
+            const numericCalories =
+              typeof item.calories === "number"
+                ? item.calories
+                : Number(item.calories);
+            if (
+              Number.isFinite(numericCalories) &&
+              numericCalories > caloriesLimit
+            ) {
+              return false;
+            }
+          }
+
+          if (hasSearch) {
+            const nameText =
+              language === "ar"
+                ? item.name_ar?.trim() || item.name_en?.trim() || ""
+                : item.name_en?.trim() || item.name_ar?.trim() || "";
+            const descriptionText =
+              language === "ar"
+                ? item.description_ar?.trim() || item.description_en?.trim() || ""
+                : item.description_en?.trim() || item.description_ar?.trim() || "";
+            const normalizedName = normalizeForSearch(nameText);
+            const normalizedDescription = normalizeForSearch(descriptionText);
+            const normalizedCategoryName = normalizeForSearch(category.localizedName);
+            if (
+              !normalizedName.includes(normalizedSearch) &&
+              !normalizedDescription.includes(normalizedSearch) &&
+              !normalizedCategoryName.includes(normalizedSearch)
+            ) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+
+        if (filteredItems.length === 0) return null;
+        return {
+          ...category,
+          items: filteredItems,
+        };
+      })
+      .filter((category): category is LocalizedCategory => Boolean(category));
+  }, [
+    localizedCategories,
+    offersOnly,
+    availableOnly,
+    selectedPills,
+    caloriesLimit,
+    categoryFilter,
+    debouncedSearch,
+    language,
+  ]);
+
+  const displayCategories = filteredCategories;
+  const hasBaseItems = sortedCategories.some((category) => category.items.length > 0);
+  const emptyMessage =
+    hasBaseItems && filtersActive ? labels.noMatches : labels.updatingMessage;
 
   const getItemName = (item: ItemRecord) =>
     language === "ar"
@@ -633,9 +906,160 @@ export function MenuClient({
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        <section className="mb-10">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-base font-semibold text-foreground">
+              {labels.filterTitle}
+            </p>
+            <div className="flex items-center gap-2">
+              {filtersActive && (
+                <Button variant="link" size="sm" onClick={handleClearFilters}>
+                  {labels.clearFilters}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => setFiltersOpen((prev) => !prev)}
+                className="whitespace-nowrap"
+              >
+                {filtersOpen
+                  ? language === "ar"
+                    ? "إخفاء المرشحات"
+                    : "Hide filters"
+                  : language === "ar"
+                    ? "عرض المرشحات"
+                    : "Show filters"}
+              </Button>
+            </div>
+          </div>
+          {filtersOpen && (
+            <div className="mt-4 space-y-5 rounded-3xl border border-border bg-card/90 p-5 shadow-sm ring-1 ring-black/5 dark:bg-slate-900/70">
+            <div className="relative">
+              <Search
+                className={cn(
+                  "absolute top-1/2 -translate-y-1/2 text-slate-400",
+                  language === "ar" ? "right-4" : "left-4"
+                )}
+              />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder={labels.searchPlaceholder}
+                onBlur={handleSearchBlur}
+                onKeyDown={handleSearchKeyDown}
+                dir={language === "ar" ? "rtl" : "ltr"}
+                className={cn(
+                  "h-12 rounded-full border border-border bg-background/90 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-primary",
+                  language === "ar" ? "pr-12 text-right" : "pl-12 text-left"
+                )}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleSearchClear}
+                  className={cn(
+                    "absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1 text-slate-500 shadow hover:text-slate-900",
+                    language === "ar" ? "left-3" : "right-3"
+                  )}
+                  aria-label={labels.clearFilters}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                {labels.quickFilters}
+              </p>
+              <div
+                className={cn(
+                  "-mx-1 mt-2 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1",
+                  language === "ar" && "flex-row-reverse"
+                )}
+              >
+                {FILTER_PILLS.map((pill) => {
+                  const active = selectedPills.includes(pill.key);
+                  return (
+                    <button
+                      key={pill.key}
+                      type="button"
+                      onClick={() => handlePillToggle(pill.key)}
+                      className={cn(
+                        "snap-start rounded-full border px-4 py-1 text-xs font-semibold transition",
+                        active
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border/70 bg-background/80 text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {pill.label[language]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+              <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex items-center justify-between rounded-2xl border border-border bg-background/60 px-4 py-3">
+                <p className="text-sm font-medium text-foreground">
+                  {labels.availableToggle}
+                </p>
+                <Switch
+                  checked={availableOnly}
+                  onCheckedChange={handleAvailableToggle}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-border bg-background/60 px-4 py-3">
+                <p className="text-sm font-medium text-foreground">
+                  {labels.offersToggle}
+                </p>
+                <Switch
+                  checked={offersOnly}
+                  onCheckedChange={handleOffersToggle}
+                />
+              </div>
+            </div>
+              <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {labels.maxCaloriesLabel}
+                </p>
+                <Input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  dir={language === "ar" ? "rtl" : "ltr"}
+                  value={maxCalories}
+                  onChange={(event) => handleCaloriesChange(event.target.value)}
+                  placeholder={labels.maxCaloriesPlaceholder}
+                  className="mt-2"
+                />
+              </div>
+                <div>
+                <p className="text-sm font-medium text-foreground">
+                  {labels.dietLabel}
+                </p>
+                <select
+                  className="mt-2 w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+                  value={categoryFilter}
+                  onChange={(event) =>
+                    handleDietChange(event.target.value)
+                  }
+                  dir={language === "ar" ? "rtl" : "ltr"}
+                >
+                  <option value="">{labels.dietPlaceholder}</option>
+                  {categoryOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          )}
+        </section>
         {displayCategories.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
-            {labels.updatingMessage}
+            {emptyMessage}
           </div>
         ) : (
           <div className="space-y-10">
