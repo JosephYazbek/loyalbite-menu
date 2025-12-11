@@ -667,6 +667,11 @@ export default function ItemsClient({
                           Vegan
                         </span>
                       )}
+                      {item.is_gluten_free && (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+                          Gluten-Free
+                        </span>
+                      )}
                     </div>
                   </td>
 

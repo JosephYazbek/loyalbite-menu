@@ -170,7 +170,11 @@ export function BranchesClient() {
   const handleChange = (field: keyof FormState, value: unknown) => {
     setFormState((prev) => {
       if (field === "slug") {
-        return { ...prev, slug: slugify(String(value ?? "")) };
+        const rawValue = String(value ?? "");
+        return {
+          ...prev,
+          slug: rawValue.length === 0 ? "" : slugify(rawValue),
+        };
       }
 
       if (field === "phone" || field === "whatsapp") {
@@ -744,5 +748,4 @@ export function BranchesClient() {
     </div>
   );
 }
-
 

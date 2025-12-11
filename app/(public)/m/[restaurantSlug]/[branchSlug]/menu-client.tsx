@@ -76,7 +76,6 @@ const UI_TEXT = {
     languageLabel: "Language",
     branchLabel: "Branch",
     jumpToCategory: "Jump to category",
-    curatedSelection: "Curated selection",
     itemsSingle: "item",
     itemsPlural: "items",
     updatingMessage: "This menu is being updated. Please check back soon.",
@@ -89,7 +88,6 @@ const UI_TEXT = {
     languageLabel: "اللغة",
     branchLabel: "الفرع",
     jumpToCategory: "انتقل إلى الفئة",
-    curatedSelection: "مختارات منسقة",
     itemsSingle: "عنصر",
     itemsPlural: "عناصر",
     updatingMessage: "يتم تحديث هذه القائمة. يرجى التحقق لاحقاً.",
@@ -446,16 +444,18 @@ export function MenuClient({
             )}
           >
             <div>
-              <p
-                className={cn(
-                  "text-amber-600/80",
-                  language === "en"
-                    ? "text-xs uppercase tracking-[0.25em]"
-                    : "text-sm font-semibold"
-                )}
-              >
-                {category.is_offers ? offersLabel : labels.curatedSelection}
-              </p>
+              {category.is_offers ? (
+                <p
+                  className={cn(
+                    "text-amber-600/80",
+                    language === "en"
+                      ? "text-xs uppercase tracking-[0.25em]"
+                      : "text-sm font-semibold"
+                  )}
+                >
+                  {offersLabel}
+                </p>
+              ) : null}
               <h2
                 className={cn(
                   "mt-1 text-2xl font-semibold text-slate-900 dark:text-white",
