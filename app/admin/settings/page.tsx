@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeSettingsPanel } from "./theme-settings-panel";
+import { DangerZonePanel } from "./danger-zone-panel";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export default async function SettingsPage() {
@@ -16,13 +17,24 @@ export default async function SettingsPage() {
 
   const { data: membership } = await supabase
     .from("restaurant_users")
-    .select("role")
+    .select(
+      `
+        role,
+        restaurant_id,
+        restaurant:restaurant_id (
+          id,
+          name
+        )
+      `
+    )
     .eq("user_id", user.id)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
   const isOwner = membership?.role === "owner";
+  const restaurantId = membership?.restaurant_id ?? null;
+  const restaurantName = membership?.restaurant?.name ?? "your restaurant";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6">
@@ -79,6 +91,13 @@ export default async function SettingsPage() {
               </Button>
             </div>
           </section>
+        )}
+        {restaurantId && (
+          <DangerZonePanel
+            restaurantId={restaurantId}
+            restaurantName={restaurantName}
+            role={membership?.role ?? "staff"}
+          />
         )}
       </div>
     </div>
