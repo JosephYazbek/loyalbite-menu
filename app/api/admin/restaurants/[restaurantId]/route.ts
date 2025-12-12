@@ -53,16 +53,55 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const supabaseAdmin = getSupabaseAdminClient();
 
-  const { data: branchRows, error: branchError } = await supabaseAdmin
-    .from("branches")
-    .select("id")
-    .eq("restaurant_id", restaurantId);
+  const extractPathFromPublicUrl = (url: string) => {
+    const marker = "/storage/v1/object/public/";
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    const after = url.slice(idx + marker.length);
+    const [bucket, ...rest] = after.split("/");
+    if (!bucket || rest.length === 0) return null;
+    return { bucket, path: rest.join("/") };
+  };
+
+  const [{ data: branchRows, error: branchError }, { data: itemRows }, { data: categoryRows }, { data: restaurantRow }] =
+    await Promise.all([
+      supabaseAdmin.from("branches").select("id").eq("restaurant_id", restaurantId),
+      supabaseAdmin.from("items").select("id, image_url").eq("restaurant_id", restaurantId),
+      supabaseAdmin.from("categories").select("id, image_url").eq("restaurant_id", restaurantId),
+      supabaseAdmin.from("restaurants").select("logo_url, cover_image_url").eq("id", restaurantId).maybeSingle(),
+    ]);
 
   if (branchError) {
     return NextResponse.json({ error: branchError.message }, { status: 400 });
   }
 
   const branchIds = (branchRows ?? []).map((record) => record.id).filter(Boolean);
+
+  // Best-effort storage cleanup before DB deletes
+  const bucketPaths: Record<string, string[]> = {};
+  const addPath = (url?: string | null) => {
+    if (!url) return;
+    const parsed = extractPathFromPublicUrl(url);
+    if (!parsed) return;
+    bucketPaths[parsed.bucket] = bucketPaths[parsed.bucket] || [];
+    bucketPaths[parsed.bucket].push(parsed.path);
+  };
+
+  addPath(restaurantRow?.logo_url ?? null);
+  addPath(restaurantRow?.cover_image_url ?? null);
+  (itemRows ?? []).forEach((item) => addPath(item.image_url as string | null));
+  (categoryRows ?? []).forEach((cat) => addPath(cat.image_url as string | null));
+
+  for (const [bucket, paths] of Object.entries(bucketPaths)) {
+    if (!paths.length) continue;
+    const { error } = await supabaseAdmin.storage.from(bucket).remove(paths);
+    if (error) {
+      return NextResponse.json(
+        { error: `Failed to delete assets from ${bucket}: ${error.message}` },
+        { status: 400 }
+      );
+    }
+  }
 
   if (branchIds.length > 0) {
     const { error: overridesError } = await supabaseAdmin

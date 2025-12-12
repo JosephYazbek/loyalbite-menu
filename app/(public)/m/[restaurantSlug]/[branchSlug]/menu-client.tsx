@@ -1017,7 +1017,12 @@ export function MenuClient({
                 />
               </div>
             </div>
-              <div className="grid gap-4 md:grid-cols-2">
+            {offersOnly && !sortedCategories.some((cat) => cat.is_offers) && (
+              <p className="text-xs text-amber-700">
+                Mark at least one category as an Offer in Menu &gt; Categories to show results here.
+              </p>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm font-medium text-foreground">
                   {labels.maxCaloriesLabel}

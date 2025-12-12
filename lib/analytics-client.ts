@@ -40,7 +40,13 @@ const getSessionId = (): string | null => {
 
 const getDeviceType = () => {
   if (typeof window === "undefined") return "desktop";
-  return window.innerWidth <= 1024 ? "mobile" : "desktop";
+
+  const ua = navigator.userAgent || "";
+  const isMobileUa = /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(ua);
+  if (isMobileUa) return "mobile";
+
+  // Fallback to viewport width for unknown agents (e.g., some tablets)
+  return window.innerWidth <= 900 ? "mobile" : "desktop";
 };
 
 export async function logAnalyticsEvent(

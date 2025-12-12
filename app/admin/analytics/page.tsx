@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { RangeSelector } from "./range-selector";
 import { ViewsChart, DailyViewPoint } from "./views-chart";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 type SearchParams = {
   range?: string;
@@ -40,7 +42,6 @@ type TopItemRow = {
 };
 
 const RANGE_VALUES = new Set(["7d", "30d", "all"]);
-
 const DEFAULT_RANGE: "7d" | "30d" | "all" = "7d";
 
 function resolveRange(value: string | undefined): "7d" | "30d" | "all" {
@@ -60,10 +61,7 @@ const getRangeStartDate = (range: "7d" | "30d" | "all") => {
 const formatDateLabel = (date: Date) =>
   date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-const buildDailySeries = (
-  map: Map<string, number>,
-  start: Date | null
-): DailyViewPoint[] => {
+const buildDailySeries = (map: Map<string, number>, start: Date | null): DailyViewPoint[] => {
   if (!map.size && !start) return [];
   if (!start) {
     return Array.from(map.entries())
@@ -95,9 +93,7 @@ type AnalyticsPageProps = {
   searchParams: Promise<SearchParams>;
 };
 
-export default async function AnalyticsPage({
-  searchParams,
-}: AnalyticsPageProps) {
+export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const { range } = await searchParams;
   const rangeValue = resolveRange(range);
   const startDate = getRangeStartDate(rangeValue);
@@ -137,37 +133,19 @@ export default async function AnalyticsPage({
 
   const [{ data: restaurant }, { data: events }, { data: branches }, { data: categories }, { data: items }] =
     await Promise.all([
-      supabase
-        .from("restaurants")
-        .select("id, name")
-        .eq("id", restaurantId)
-        .maybeSingle(),
+      supabase.from("restaurants").select("id, name").eq("id", restaurantId).maybeSingle(),
       eventsQuery,
-      supabase
-        .from("branches")
-        .select("id, name")
-        .eq("restaurant_id", restaurantId),
-      supabase
-        .from("categories")
-        .select("id, name_en, is_offers")
-        .eq("restaurant_id", restaurantId),
-      supabase
-        .from("items")
-        .select("id, name_en, category_id")
-        .eq("restaurant_id", restaurantId),
+      supabase.from("branches").select("id, name").eq("restaurant_id", restaurantId),
+      supabase.from("categories").select("id, name_en, is_offers").eq("restaurant_id", restaurantId),
+      supabase.from("items").select("id, name_en, category_id").eq("restaurant_id", restaurantId),
     ]);
 
   if (!restaurant) {
     redirect("/admin");
   }
 
-  const branchMap = new Map<string, string>(
-    (branches ?? []).map((branch) => [branch.id, branch.name])
-  );
-  const categoryMap = new Map<
-    string,
-    { name: string; isOffers: boolean }
-  >(
+  const branchMap = new Map<string, string>((branches ?? []).map((branch) => [branch.id, branch.name]));
+  const categoryMap = new Map<string, { name: string; isOffers: boolean }>(
     (categories ?? []).map((category) => [
       category.id,
       {
@@ -203,13 +181,9 @@ export default async function AnalyticsPage({
     }
   });
 
-  const menuViews = analyticsEvents.filter(
-    (event) => event.event_type === "menu_view"
-  );
+  const menuViews = analyticsEvents.filter((event) => event.event_type === "menu_view");
   const totalMenuViews = menuViews.length;
-  const whatsappClicks = analyticsEvents.filter(
-    (event) => event.event_type === "whatsapp_click"
-  ).length;
+  const whatsappClicks = analyticsEvents.filter((event) => event.event_type === "whatsapp_click").length;
 
   const dailyMap = new Map<string, number>();
   menuViews.forEach((event) => {
@@ -221,10 +195,7 @@ export default async function AnalyticsPage({
   const branchCounts = new Map<string, number>();
   menuViews.forEach((event) => {
     if (!event.branch_id) return;
-    branchCounts.set(
-      event.branch_id,
-      (branchCounts.get(event.branch_id) ?? 0) + 1
-    );
+    branchCounts.set(event.branch_id, (branchCounts.get(event.branch_id) ?? 0) + 1);
   });
   const branchRows: BranchPerformanceRow[] = Array.from(branchCounts.entries())
     .map(([branchId, views]) => ({
@@ -238,23 +209,14 @@ export default async function AnalyticsPage({
   const categoryCounts = new Map<string, number>();
   analyticsEvents.forEach((event) => {
     if (
-      (event.event_type === "category_view" ||
-        event.event_type === "item_view") &&
+      (event.event_type === "category_view" || event.event_type === "item_view") &&
       event.category_id
     ) {
-      categoryCounts.set(
-        event.category_id,
-        (categoryCounts.get(event.category_id) ?? 0) + 1
-      );
+      categoryCounts.set(event.category_id, (categoryCounts.get(event.category_id) ?? 0) + 1);
     }
   });
-  const totalCategoryViews = Array.from(categoryCounts.values()).reduce(
-    (sum, val) => sum + val,
-    0
-  );
-  const topCategories: TopCategoryRow[] = Array.from(
-    categoryCounts.entries()
-  )
+  const totalCategoryViews = Array.from(categoryCounts.values()).reduce((sum, val) => sum + val, 0);
+  const topCategories: TopCategoryRow[] = Array.from(categoryCounts.entries())
     .map(([categoryId, views]) => ({
       categoryId,
       categoryName: categoryMap.get(categoryId)?.name ?? "Uncategorized",
@@ -267,10 +229,7 @@ export default async function AnalyticsPage({
   const itemCounts = new Map<string, number>();
   analyticsEvents.forEach((event) => {
     if (event.event_type === "item_view" && event.item_id) {
-      itemCounts.set(
-        event.item_id,
-        (itemCounts.get(event.item_id) ?? 0) + 1
-      );
+      itemCounts.set(event.item_id, (itemCounts.get(event.item_id) ?? 0) + 1);
     }
   });
   const topItems: TopItemRow[] = Array.from(itemCounts.entries())
@@ -288,12 +247,10 @@ export default async function AnalyticsPage({
     .sort((a, b) => b.views - a.views)
     .slice(0, 10);
 
-  const sessionSet = new Set(
-    analyticsEvents.map((event) => event.session_id).filter(Boolean) as string[]
-  );
+  const sessionSet = new Set(analyticsEvents.map((event) => event.session_id).filter(Boolean) as string[]);
   const uniqueSessions = sessionSet.size || totalMenuViews;
 
-  const deviceCounts = analyticsEvents.reduce(
+  const deviceCounts = menuViews.reduce(
     (acc, event) => {
       if (event.device_type === "mobile") acc.mobile += 1;
       else if (event.device_type === "desktop") acc.desktop += 1;
@@ -302,231 +259,188 @@ export default async function AnalyticsPage({
     { mobile: 0, desktop: 0 }
   );
 
-  const languageCounts = analyticsEvents.reduce<Record<string, number>>(
-    (acc, event) => {
-      const key = event.language ?? "unknown";
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    },
-    {}
-  );
+  const languageCounts = menuViews.reduce<Record<string, number>>((acc, event) => {
+    const key = event.language ?? "unknown";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
 
-  const mostUsedLanguage =
-    Object.entries(languageCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-    "unknown";
+  const mostUsedLanguage = Object.entries(languageCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "unknown";
   const languageLabel =
-    mostUsedLanguage === "ar"
-      ? "Arabic"
-      : mostUsedLanguage === "en"
-        ? "English"
-        : "Unknown";
+    mostUsedLanguage === "ar" ? "Arabic" : mostUsedLanguage === "en" ? "English" : "Unknown";
 
-  const mobilePercentage =
-    totalMenuViews > 0
-      ? Math.round((deviceCounts.mobile / totalMenuViews) * 100)
-      : 0;
+  const mobilePercentage = totalMenuViews > 0 ? Math.round((deviceCounts.mobile / totalMenuViews) * 100) : 0;
 
   const deviceBreakdown = [
     {
       label: "Mobile",
       value: deviceCounts.mobile,
-      percentage:
-        totalMenuViews > 0
-          ? Math.round((deviceCounts.mobile / totalMenuViews) * 100)
-          : 0,
+      percentage: totalMenuViews > 0 ? Math.round((deviceCounts.mobile / totalMenuViews) * 100) : 0,
     },
     {
       label: "Desktop",
       value: deviceCounts.desktop,
-      percentage:
-        totalMenuViews > 0
-          ? Math.round((deviceCounts.desktop / totalMenuViews) * 100)
-          : 0,
+      percentage: totalMenuViews > 0 ? Math.round((deviceCounts.desktop / totalMenuViews) * 100) : 0,
     },
   ];
 
-  const languageBreakdown = Object.entries(languageCounts).map(
-    ([key, value]) => ({
-      label: key === "ar" ? "Arabic" : key === "en" ? "English" : "Unknown",
-      value,
-    })
-  );
+  const languageBreakdown = Object.entries(languageCounts).map(([key, value]) => ({
+    label: key === "ar" ? "Arabic" : key === "en" ? "English" : "Unknown",
+    value,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6">
       <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            Insights
-          </p>
-          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground">
-            How customers interact with your menu.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Restaurant: {restaurant.name}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <RangeSelector value={rangeValue} />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <KpiCard title="Menu views" value={totalMenuViews} />
-        <KpiCard title="Unique sessions" value={uniqueSessions} />
-        <KpiCard title="Most used language" value={languageLabel} />
-        <KpiCard title="Mobile traffic" value={`${mobilePercentage}%`} />
-        <KpiCard title="WhatsApp clicks" value={whatsappClicks} />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <KpiCard title="Offer section views" value={offerSectionViews} />
-        <KpiCard title="Offer item views" value={offerItemViews} />
-      </div>
-
-      <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              Views over time
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Menu views per day in the selected range.
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Insights</p>
+            <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
+            <p className="text-sm text-muted-foreground">How customers interact with your menu.</p>
+            <p className="text-xs text-muted-foreground">Restaurant: {restaurant.name}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <RangeSelector value={rangeValue} />
           </div>
         </div>
-        {dailySeries.length === 0 ? (
-          <EmptyState message="No views recorded yet for this period." />
-        ) : (
-          <ViewsChart data={dailySeries} />
-        )}
-      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <KpiCard title="Menu views" value={totalMenuViews} />
+          <KpiCard title="Unique sessions" value={uniqueSessions} />
+          <KpiCard title="Most used language" value={languageLabel} />
+          <KpiCard title="Mobile traffic" value={`${mobilePercentage}%`} />
+          <KpiCard title="WhatsApp clicks" value={whatsappClicks} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <KpiCard title="Offer section views" value={offerSectionViews} />
+          <KpiCard title="Offer item views" value={offerItemViews} />
+        </div>
+
         <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">
-            Branch performance
-          </h2>
-          {branchRows.length === 0 ? (
-            <EmptyState message="No branch data yet." />
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Views over time</h2>
+              <p className="text-sm text-muted-foreground">Menu views per day in the selected range.</p>
+            </div>
+          </div>
+          {dailySeries.length === 0 ? (
+            <EmptyState message="No views recorded yet for this period." />
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-muted-foreground">
-                <tr>
-                  <th className="py-2 text-left">Branch</th>
-                  <th className="py-2 text-right">Views</th>
-                  <th className="py-2 text-right">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {branchRows.map((row) => (
-                  <tr key={row.branchId} className="border-t border-border/60">
-                    <td className="py-2 font-medium text-foreground">
-                      {row.branchName}
-                    </td>
-                    <td className="py-2 text-right">{row.views}</td>
-                    <td className="py-2 text-right">
-                      {Math.round(row.share * 100)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ViewsChart data={dailySeries} />
           )}
         </section>
 
-        <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">
-            Device & language
-          </h2>
-          {totalMenuViews === 0 ? (
-            <EmptyState message="No device data yet." />
-          ) : (
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                  Device split
-                </p>
-                <div className="mt-2 space-y-2">
-                  {deviceBreakdown.map((row) => (
-                    <div
-                      key={row.label}
-                      className="flex items-center justify-between rounded-2xl border border-border px-3 py-2"
-                    >
-                      <span className="font-medium text-foreground">
-                        {row.label}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {row.value} ({row.percentage}%)
-                      </span>
-                    </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Menu health</h2>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/admin/menu/health">View details</Link>
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Track how complete and effective your menu is compared to best practices.
+            </p>
+          </section>
+
+          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Branch performance</h2>
+            {branchRows.length === 0 ? (
+              <EmptyState message="No branch data yet." />
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-muted-foreground">
+                  <tr>
+                    <th className="py-2 text-left">Branch</th>
+                    <th className="py-2 text-right">Views</th>
+                    <th className="py-2 text-right">Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {branchRows.map((row) => (
+                    <tr key={row.branchId} className="border-t border-border/60">
+                      <td className="py-2 font-medium text-foreground">{row.branchName}</td>
+                      <td className="py-2 text-right">{row.views}</td>
+                      <td className="py-2 text-right">{Math.round(row.share * 100)}%</td>
+                    </tr>
                   ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                  Languages
-                </p>
-                {languageBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No language data yet.
-                  </p>
-                ) : (
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Device & language</h2>
+            {totalMenuViews === 0 ? (
+              <EmptyState message="No device data yet." />
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Device split</p>
                   <div className="mt-2 space-y-2">
-                    {languageBreakdown.map((row) => (
+                    {deviceBreakdown.map((row) => (
                       <div
                         key={row.label}
                         className="flex items-center justify-between rounded-2xl border border-border px-3 py-2"
                       >
-                        <span className="font-medium text-foreground">
-                          {row.label}
-                        </span>
+                        <span className="font-medium text-foreground">{row.label}</span>
                         <span className="text-sm text-muted-foreground">
-                          {row.value}
+                          {row.value} ({row.percentage}%)
                         </span>
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Languages</p>
+                  {languageBreakdown.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No language data yet.</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {languageBreakdown.map((row) => (
+                        <div
+                          key={row.label}
+                          className="flex items-center justify-between rounded-2xl border border-border px-3 py-2"
+                        >
+                          <span className="font-medium text-foreground">{row.label}</span>
+                          <span className="text-sm text-muted-foreground">{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </section>
-      </div>
+            )}
+          </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">
-            Top categories
-          </h2>
-          {topCategories.length === 0 ? (
-            <EmptyState message="No category interactions yet." />
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-muted-foreground">
-                <tr>
-                  <th className="py-2 text-left">Category</th>
-                  <th className="py-2 text-right">Views</th>
-                  <th className="py-2 text-right">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topCategories.map((row) => (
-                  <tr key={row.categoryId} className="border-t border-border/60">
-                    <td className="py-2 font-medium text-foreground">
-                      {row.categoryName}
-                    </td>
-                    <td className="py-2 text-right">{row.views}</td>
-                    <td className="py-2 text-right">
-                      {Math.round(row.share * 100)}%
-                    </td>
+          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Top categories</h2>
+            {topCategories.length === 0 ? (
+              <EmptyState message="No category interactions yet." />
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-muted-foreground">
+                  <tr>
+                    <th className="py-2 text-left">Category</th>
+                    <th className="py-2 text-right">Views</th>
+                    <th className="py-2 text-right">Share</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
+                </thead>
+                <tbody>
+                  {topCategories.map((row) => (
+                    <tr key={row.categoryId} className="border-t border-border/60">
+                      <td className="py-2 font-medium text-foreground">{row.categoryName}</td>
+                      <td className="py-2 text-right">{row.views}</td>
+                      <td className="py-2 text-right">{Math.round(row.share * 100)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
 
         <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-foreground">Top items</h2>
@@ -544,12 +458,8 @@ export default async function AnalyticsPage({
               <tbody>
                 {topItems.map((row) => (
                   <tr key={row.itemId} className="border-t border-border/60">
-                    <td className="py-2 font-medium text-foreground">
-                      {row.itemName}
-                    </td>
-                    <td className="py-2 text-left text-muted-foreground">
-                      {row.categoryName}
-                    </td>
+                    <td className="py-2 font-medium text-foreground">{row.itemName}</td>
+                    <td className="py-2 text-left text-muted-foreground">{row.categoryName}</td>
                     <td className="py-2 text-right">{row.views}</td>
                   </tr>
                 ))}
@@ -557,7 +467,6 @@ export default async function AnalyticsPage({
             </table>
           )}
         </section>
-      </div>
       </div>
     </div>
   );
@@ -570,9 +479,7 @@ type KpiCardProps = {
 
 const KpiCard = ({ title, value }: KpiCardProps) => (
   <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-    <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-      {title}
-    </p>
+    <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{title}</p>
     <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
   </div>
 );
