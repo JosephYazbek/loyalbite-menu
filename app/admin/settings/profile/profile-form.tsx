@@ -661,7 +661,7 @@ const BrandingCard = ({
         </Button>
         <Button
           type="button"
-          variant="ghost"
+          variant="destructive"
           size="sm"
           onClick={onRemove}
           disabled={!imageUrl || uploading}

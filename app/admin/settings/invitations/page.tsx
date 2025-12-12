@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { InviteManager } from "./invite-manager";
+import { Button } from "@/components/ui/button";
 
 export default async function InvitationsSettingsPage() {
   const supabase = await createSupabaseServerClient();
@@ -73,20 +75,25 @@ export default async function InvitationsSettingsPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-6">
       <div className="space-y-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            Settings
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground">
-            Team invitations
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Generate invite links for teammates to join{" "}
-            <span className="font-semibold text-foreground">
-              {ownerMembership.restaurant?.name}
-            </span>
-            .
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Settings
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-foreground">
+              Team invitations
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Generate invite links for teammates to join{" "}
+              <span className="font-semibold text-foreground">
+                {ownerMembership.restaurant?.name}
+              </span>
+              .
+            </p>
+          </div>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/admin/settings">← Back to settings</Link>
+          </Button>
         </div>
 
         <InviteManager

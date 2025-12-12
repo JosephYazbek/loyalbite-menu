@@ -14,8 +14,22 @@ export type AnalyticsEventPayload = {
     | "microsite_to_menu_click"
     | "menu_print_view"
     | "menu_search"
-    | "menu_filter";
+    | "menu_filter"
+    | "menu_favorite"
+    | "menu_unfavorite"
+    | "menu_cached_load"
+    | "item_modal_open"
+    | "item_modal_close"
+    | "item_featured_view"
+    | "modifier_group_open"
+    | "modifier_option_select"
+    | "modifier_option_remove"
+    | "filter_toggle"
+    | "allergen_filter_apply"
+    | "favorites_filter_apply"
+    | "featured_filter_apply";
   language?: "en" | "ar";
+  metadata?: Record<string, unknown>;
 };
 
 const SESSION_KEY = "lb_session_id";
@@ -37,6 +51,7 @@ const getSessionId = (): string | null => {
     return null;
   }
 };
+export const getAnalyticsSessionId = getSessionId;
 
 const getDeviceType = () => {
   if (typeof window === "undefined") return "desktop";
@@ -75,6 +90,7 @@ export async function logAnalyticsEvent(
         language: payload.language,
         deviceType,
         sessionId,
+        metadata: payload.metadata ?? null,
       }),
     });
   } catch (error) {

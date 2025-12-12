@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { normalizeBranchSlugs } from "@/lib/branch-slug";
 import ItemsClient from "./components/items-client";
+import {
+  fetchItemModifierAssignments,
+  fetchModifierGroups,
+  mapItemModifiers,
+} from "@/lib/menu/loaders";
 
 type BranchRecord = {
   id: string;
@@ -76,8 +81,17 @@ export default async function ItemsPage() {
         is_vegetarian,
         is_vegan,
         is_gluten_free,
+        contains_dairy,
+        contains_nuts,
+        contains_eggs,
+        contains_shellfish,
+        contains_soy,
+        contains_sesame,
+        is_featured,
+        recommendation_score,
         is_visible,
         is_available,
+        diet_category,
         item_code,
         display_order,
         created_at,
@@ -90,6 +104,13 @@ export default async function ItemsPage() {
 
   const categories = categoriesData ?? [];
   const items = itemsData ?? [];
+
+  const itemIds = items.map((item) => item.id);
+  const [modifierGroups, assignmentMap] = await Promise.all([
+    fetchModifierGroups(supabase, restaurantId),
+    fetchItemModifierAssignments(supabase, itemIds),
+  ]);
+  const itemModifiers = mapItemModifiers(assignmentMap, modifierGroups);
 
   const [{ data: restaurantRecord }, { data: branchData }] = await Promise.all([
     supabase
@@ -133,6 +154,8 @@ export default async function ItemsPage() {
           branches={branches}
           restaurantSlug={restaurantSlug}
           restaurantDefaultLanguage={restaurantDefaultLanguage}
+          modifiers={modifierGroups}
+          itemModifiers={itemModifiers}
         />
       </div>
     </div>

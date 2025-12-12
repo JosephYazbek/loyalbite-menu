@@ -9,18 +9,22 @@ const EVENT_TYPES = new Set([
   "microsite_view",
   "microsite_to_menu_click",
   "menu_print_view",
+  "menu_search",
+  "menu_filter",
+  "menu_favorite",
+  "menu_unfavorite",
+  "menu_cached_load",
+  "item_modal_open",
+  "item_modal_close",
+  "item_featured_view",
+  "modifier_group_open",
+  "modifier_option_select",
+  "modifier_option_remove",
+  "filter_toggle",
+  "allergen_filter_apply",
+  "favorites_filter_apply",
+  "featured_filter_apply",
 ]);
-
-type LogEventBody = {
-  restaurantId?: string;
-  branchId?: string;
-  categoryId?: string;
-  itemId?: string;
-  eventType?: string;
-  deviceType?: string | null;
-  language?: string | null;
-  sessionId?: string | null;
-};
 
 const isValidUuid = (value: string | undefined): value is string => {
   if (!value) return false;
@@ -30,15 +34,24 @@ const isValidUuid = (value: string | undefined): value is string => {
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
 
-  let body: LogEventBody;
+  let body: any;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { restaurantId, branchId, categoryId, itemId, eventType, deviceType, language, sessionId } =
-    body;
+  const {
+    restaurantId,
+    branchId,
+    categoryId,
+    itemId,
+    eventType,
+    deviceType,
+    language,
+    sessionId,
+    metadata,
+  } = body ?? {};
 
   if (!isValidUuid(restaurantId) || !isValidUuid(branchId) || !eventType) {
     return NextResponse.json(
@@ -48,10 +61,7 @@ export async function POST(req: Request) {
   }
 
   if (!EVENT_TYPES.has(eventType)) {
-    return NextResponse.json(
-      { error: "Unsupported eventType." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Unsupported eventType." }, { status: 400 });
   }
 
   const [{ data: branchRecord }, categoryResult, itemResult] = await Promise.all([
@@ -112,9 +122,10 @@ export async function POST(req: Request) {
     category_id: categoryId ?? null,
     item_id: itemId ?? null,
     event_type: eventType,
-    device_type: deviceType ?? null,
-    language: language ?? null,
-    session_id: sessionId ?? null,
+    device_type: deviceType === "mobile" || deviceType === "desktop" ? deviceType : null,
+    language: language === "en" || language === "ar" ? language : null,
+    session_id: typeof sessionId === "string" ? sessionId : null,
+    metadata: typeof metadata === "object" && metadata !== null ? metadata : null,
   };
 
   const { error: insertError } = await supabase

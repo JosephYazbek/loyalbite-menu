@@ -4,51 +4,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX, KeyboardEvent as ReactKeyboardEvent } from "react";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
-import { logAnalyticsEvent } from "@/lib/analytics-client";
+import { Heart, Search, Star, X } from "lucide-react";
+import { getAnalyticsSessionId, logAnalyticsEvent } from "@/lib/analytics-client";
 import { cn } from "@/lib/utils";
 import { SupportedLanguage } from "@/lib/language";
 import { WhatsAppLogo } from "@/components/whatsapp-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { MenuCategory, MenuItem } from "@/lib/menu/types";
 
 type MenuLanguage = SupportedLanguage;
 
-type ItemRecord = {
-  id: string;
-  category_id: string;
-  name_en: string | null;
-  name_ar: string | null;
-  description_en: string | null;
-  description_ar: string | null;
-  price: number | string | null;
-  secondary_price: number | string | null;
-  primary_currency: string | null;
-  secondary_currency: string | null;
-  image_url: string | null;
-  calories: number | string | null;
-  is_new: boolean | null;
-  is_popular: boolean | null;
-  is_spicy: boolean | null;
-  is_vegetarian: boolean | null;
-  is_vegan: boolean | null;
-  is_gluten_free: boolean | null;
-  is_available: boolean | null;
-  is_visible: boolean | null;
-  diet_category: string | null;
-};
+type ItemRecord = MenuItem;
 
-type CategoryWithItems = {
-  id: string;
-  name_en: string | null;
-  name_ar: string | null;
-  description_en: string | null;
-  description_ar: string | null;
-  is_offers?: boolean | null;
-  is_visible?: boolean | null;
-  items: ItemRecord[];
-};
+type CategoryWithItems = MenuCategory;
 
 type LocalizedCategory = CategoryWithItems & {
   localizedName: string;
@@ -79,6 +56,8 @@ type MenuClientProps = {
   categories: CategoryWithItems[];
   accentColor: string;
   initialLanguage: MenuLanguage;
+  fromSnapshot?: boolean;
+  snapshotId?: string | null;
 };
 
 const LANGUAGE_STORAGE_KEY = "lb_menu_lang";
@@ -172,6 +151,23 @@ const FILTER_PILLS = [
 
 type FilterPillKey = (typeof FILTER_PILLS)[number]["key"];
 
+const ALLERGEN_LABELS: Record<
+  | "contains_dairy"
+  | "contains_nuts"
+  | "contains_eggs"
+  | "contains_shellfish"
+  | "contains_soy"
+  | "contains_sesame",
+  string
+> = {
+  contains_dairy: "Dairy",
+  contains_nuts: "Nuts",
+  contains_eggs: "Eggs",
+  contains_shellfish: "Shellfish",
+  contains_soy: "Soy",
+  contains_sesame: "Sesame",
+};
+
 const normalizeForSearch = (value: string) =>
   value
     .toLowerCase()
@@ -199,12 +195,29 @@ const formatPrice = (
   }
 };
 
+const sortItemsByPriority = (a: ItemRecord, b: ItemRecord) => {
+  if (a.is_featured && !b.is_featured) return -1;
+  if (b.is_featured && !a.is_featured) return 1;
+  const aScore =
+    a.recommendation_score !== null && a.recommendation_score !== undefined
+      ? Number(a.recommendation_score)
+      : -Infinity;
+  const bScore =
+    b.recommendation_score !== null && b.recommendation_score !== undefined
+      ? Number(b.recommendation_score)
+      : -Infinity;
+  if (bScore !== aScore) return bScore - aScore;
+  return (a.display_order ?? 0) - (b.display_order ?? 0);
+};
+
 export function MenuClient({
   restaurant,
   branch,
   categories,
   accentColor,
   initialLanguage,
+  fromSnapshot: _fromSnapshot = false,
+  snapshotId: _snapshotId = null,
 }: MenuClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -223,6 +236,22 @@ export function MenuClient({
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const lastLoggedSearchRef = useRef("");
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [hideAllergens, setHideAllergens] = useState({
+    dairy: false,
+    nuts: false,
+    eggs: false,
+    shellfish: false,
+    soy: false,
+    sesame: false,
+  });
+  const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [hasCustomizationsOnly, setHasCustomizationsOnly] = useState(false);
+  const [activeItem, setActiveItem] = useState<ItemRecord | null>(null);
+  const [modifierSelections, setModifierSelections] = useState<Record<string, Set<string>>>({});
+  const [fromSnapshot] = useState(_fromSnapshot);
+  const [snapshotNoticeVisible, setSnapshotNoticeVisible] = useState(_fromSnapshot);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -236,6 +265,43 @@ export function MenuClient({
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    const initialFavorites = new Set<string>();
+    categories.forEach((cat) =>
+      cat.items.forEach((item) => {
+        if (item.favorite) initialFavorites.add(item.id);
+      })
+    );
+    setFavoriteIds(initialFavorites);
+  }, [categories]);
+
+  useEffect(() => {
+    if (fromSnapshot) {
+      logAnalyticsEvent({
+        restaurantId: restaurant.id,
+        branchId: branch.id,
+        eventType: "menu_cached_load",
+        language: languageRef.current,
+      });
+    }
+  }, [fromSnapshot, restaurant.id, branch.id]);
+
+  useEffect(() => {
+    if (activeItem?.modifiers?.length) {
+      activeItem.modifiers.forEach((mod) =>
+        logAnalyticsEvent({
+          restaurantId: restaurant.id,
+          branchId: branch.id,
+          categoryId: activeItem.category_id,
+          itemId: activeItem.id,
+          eventType: "modifier_group_open",
+          language: languageRef.current,
+          metadata: { modifierId: mod.id },
+        })
+      );
+    }
+  }, [activeItem, restaurant.id, branch.id]);
 
   useEffect(() => {
     languageRef.current = language;
@@ -330,6 +396,7 @@ export function MenuClient({
         branchId: branch.id,
         eventType: "menu_search",
         language: languageRef.current,
+        metadata: { search_term: trimmed },
       });
     },
     [restaurant.id, branch.id]
@@ -366,6 +433,17 @@ export function MenuClient({
     setOffersOnly(false);
     setMaxCalories("");
     setCategoryFilter("");
+    setHideAllergens({
+      dairy: false,
+      nuts: false,
+      eggs: false,
+      shellfish: false,
+      soy: false,
+      sesame: false,
+    });
+    setShowFeaturedOnly(false);
+    setFavoritesOnly(false);
+    setHasCustomizationsOnly(false);
     lastLoggedSearchRef.current = "";
     logFilterEvent();
   };
@@ -419,6 +497,10 @@ export function MenuClient({
     selectedPills.length > 0 ||
     availableOnly ||
     offersOnly ||
+    showFeaturedOnly ||
+    favoritesOnly ||
+    hasCustomizationsOnly ||
+    Object.values(hideAllergens).some(Boolean) ||
     caloriesLimit !== null ||
     Boolean(categoryFilter);
 
@@ -507,65 +589,75 @@ export function MenuClient({
     const hasSearch = Boolean(normalizedSearch);
     return localizedCategories
       .map((category) => {
-        if (offersOnly && !category.is_offers) {
-          return null;
-        }
-        if (categoryFilter && category.id !== categoryFilter) {
-          return null;
-        }
-        const filteredItems = category.items.filter((item) => {
-          if (item.is_visible === false) return false;
-          if (availableOnly && item.is_available === false) return false;
+        if (offersOnly && !category.is_offers) return null;
+        if (categoryFilter && category.id !== categoryFilter) return null;
 
-          if (selectedPills.length) {
-            const matches = selectedPills.some((pill) => {
-              if (pill === "offers") {
-                return Boolean(category.is_offers);
+        const filteredItems = category.items
+          .map((item) => {
+            if (item.is_visible === false) return null;
+            if (availableOnly && item.is_available === false) return null;
+            if (showFeaturedOnly && !item.is_featured) return null;
+            if (favoritesOnly && !favoriteIds.has(item.id)) return null;
+            if (hasCustomizationsOnly && !(item.modifiers?.length)) return null;
+
+            if (selectedPills.length) {
+              const matches = selectedPills.some((pill) => {
+                if (pill === "offers") return Boolean(category.is_offers);
+                const field = pill as Exclude<FilterPillKey, "offers">;
+                return Boolean(item[field as keyof ItemRecord]);
+              });
+              if (!matches) return null;
+            }
+
+            if (caloriesLimit !== null) {
+              const numericCalories =
+                typeof item.calories === "number"
+                  ? item.calories
+                  : Number(item.calories);
+              if (Number.isFinite(numericCalories) && numericCalories > caloriesLimit) {
+                return null;
               }
-              const field = pill as Exclude<FilterPillKey, "offers">;
-              return Boolean(item[field as keyof ItemRecord]);
-            });
-            if (!matches) {
-              return false;
             }
-          }
 
-          if (caloriesLimit !== null) {
-            const numericCalories =
-              typeof item.calories === "number"
-                ? item.calories
-                : Number(item.calories);
-            if (
-              Number.isFinite(numericCalories) &&
-              numericCalories > caloriesLimit
-            ) {
-              return false;
+            const allergenBlocked =
+              (hideAllergens.dairy && item.contains_dairy) ||
+              (hideAllergens.nuts && item.contains_nuts) ||
+              (hideAllergens.eggs && item.contains_eggs) ||
+              (hideAllergens.shellfish && item.contains_shellfish) ||
+              (hideAllergens.soy && item.contains_soy) ||
+              (hideAllergens.sesame && item.contains_sesame);
+            if (allergenBlocked) return null;
+
+            if (hasSearch) {
+              const nameText =
+                language === "ar"
+                  ? item.name_ar?.trim() || item.name_en?.trim() || ""
+                  : item.name_en?.trim() || item.name_ar?.trim() || "";
+              const descriptionText =
+                language === "ar"
+                  ? item.description_ar?.trim() || item.description_en?.trim() || ""
+                  : item.description_en?.trim() || item.description_ar?.trim() || "";
+              const normalizedName = normalizeForSearch(nameText);
+              const normalizedDescription = normalizeForSearch(descriptionText);
+              const normalizedCategoryName = normalizeForSearch(category.localizedName);
+              const modifierText = normalizeForSearch(
+                (item.modifiers ?? [])
+                  .flatMap((mod) => mod.options?.map((opt) => opt.name) ?? [])
+                  .join(" ")
+              );
+
+              const matchesSearch =
+                normalizedName.includes(normalizedSearch) ||
+                normalizedDescription.includes(normalizedSearch) ||
+                normalizedCategoryName.includes(normalizedSearch) ||
+                modifierText.includes(normalizedSearch);
+              if (!matchesSearch) return null;
             }
-          }
 
-          if (hasSearch) {
-            const nameText =
-              language === "ar"
-                ? item.name_ar?.trim() || item.name_en?.trim() || ""
-                : item.name_en?.trim() || item.name_ar?.trim() || "";
-            const descriptionText =
-              language === "ar"
-                ? item.description_ar?.trim() || item.description_en?.trim() || ""
-                : item.description_en?.trim() || item.description_ar?.trim() || "";
-            const normalizedName = normalizeForSearch(nameText);
-            const normalizedDescription = normalizeForSearch(descriptionText);
-            const normalizedCategoryName = normalizeForSearch(category.localizedName);
-            if (
-              !normalizedName.includes(normalizedSearch) &&
-              !normalizedDescription.includes(normalizedSearch) &&
-              !normalizedCategoryName.includes(normalizedSearch)
-            ) {
-              return false;
-            }
-          }
-
-          return true;
-        });
+            return item;
+          })
+          .filter((item): item is ItemRecord => Boolean(item))
+          .sort(sortItemsByPriority);
 
         if (filteredItems.length === 0) return null;
         return {
@@ -583,6 +675,11 @@ export function MenuClient({
     categoryFilter,
     debouncedSearch,
     language,
+    hideAllergens,
+    showFeaturedOnly,
+    favoritesOnly,
+    favoriteIds,
+    hasCustomizationsOnly,
   ]);
 
   const displayCategories = filteredCategories;
@@ -600,6 +697,104 @@ export function MenuClient({
       ? item.description_ar?.trim() || item.description_en?.trim() || ""
       : item.description_en?.trim() || item.description_ar?.trim() || "";
 
+  const renderAllergenPills = (item: ItemRecord) => {
+    const entries = Object.entries(ALLERGEN_LABELS).filter(
+      ([key]) => (item as any)[key]
+    );
+    if (!entries.length) return null;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {entries.map(([key, label]) => (
+          <span
+            key={key}
+            className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+          >
+            ⚠ {label}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  const toggleFavorite = async (item: ItemRecord) => {
+    const sessionId = getAnalyticsSessionId();
+    if (!sessionId) return;
+    const isFav = favoriteIds.has(item.id);
+    const next = new Set(favoriteIds);
+    if (isFav) {
+      next.delete(item.id);
+      setFavoriteIds(next);
+      logAnalyticsEvent({
+        restaurantId: restaurant.id,
+        branchId: branch.id,
+        categoryId: item.category_id,
+        itemId: item.id,
+        eventType: "menu_unfavorite",
+        language: languageRef.current,
+      });
+      await fetch("/api/public/favorites/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, itemId: item.id }),
+      });
+    } else {
+      next.add(item.id);
+      setFavoriteIds(next);
+      logAnalyticsEvent({
+        restaurantId: restaurant.id,
+        branchId: branch.id,
+        categoryId: item.category_id,
+        itemId: item.id,
+        eventType: "menu_favorite",
+        language: languageRef.current,
+      });
+      await fetch("/api/public/favorites/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, itemId: item.id }),
+      });
+    }
+  };
+
+  const openItemModal = (item: ItemRecord, categoryId: string) => {
+    handleItemInteraction(item.id, categoryId);
+    setActiveItem(item);
+    setModifierSelections({});
+    logAnalyticsEvent({
+      restaurantId: restaurant.id,
+      branchId: branch.id,
+      categoryId,
+      itemId: item.id,
+      eventType: "item_modal_open",
+      language: languageRef.current,
+    });
+    if (item.is_featured) {
+      logAnalyticsEvent({
+        restaurantId: restaurant.id,
+        branchId: branch.id,
+        categoryId,
+        itemId: item.id,
+        eventType: "item_featured_view",
+        language: languageRef.current,
+      });
+    }
+  };
+
+  const closeItemModal = (shouldLog: boolean) => {
+    if (shouldLog && activeItem) {
+      logAnalyticsEvent({
+        restaurantId: restaurant.id,
+        branchId: branch.id,
+        categoryId: activeItem.category_id,
+        itemId: activeItem.id,
+        eventType: "item_modal_close",
+        language: languageRef.current,
+      });
+    }
+    setActiveItem(null);
+    setModifierSelections({});
+  };
+
   const renderItem = (categoryId: string, item: ItemRecord) => {
     const primaryPrice = formatPrice(
       item.price,
@@ -615,11 +810,12 @@ export function MenuClient({
       item.calories !== null && item.calories !== undefined && item.calories !== ""
         ? `${item.calories} kcal`
         : null;
+    const isFavorite = favoriteIds.has(item.id);
 
     return (
       <article
         key={item.id}
-        onClick={() => handleItemInteraction(item.id, categoryId)}
+        onClick={() => openItemModal(item, categoryId)}
         className="flex cursor-pointer flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:gap-6 sm:p-5"
       >
         <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800 sm:h-28 sm:w-28">
@@ -636,6 +832,25 @@ export function MenuClient({
               {labels.noImage}
             </div>
           )}
+          {item.is_featured && (
+            <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-amber-600 shadow">
+              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+              Featured
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(item);
+            }}
+            className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-rose-600 shadow hover:bg-white"
+            aria-label={isFavorite ? "Remove favorite" : "Add favorite"}
+          >
+            <Heart
+              className={cn("h-4 w-4", isFavorite ? "fill-rose-600" : "")}
+            />
+          </button>
         </div>
 
         <div className="flex flex-1 flex-col gap-3">
@@ -659,6 +874,7 @@ export function MenuClient({
                   {getItemDescription(item)}
                 </p>
               )}
+              {renderAllergenPills(item)}
             </div>
             <div
               className={cn(
@@ -797,6 +1013,18 @@ export function MenuClient({
       lang={language}
       className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
+      {snapshotNoticeVisible && (
+        <div className="bg-amber-100 px-4 py-3 text-sm text-amber-800 shadow">
+          You are viewing an offline cached menu. Some updates may not be shown.
+          <button
+            type="button"
+            className="ml-3 text-amber-700 underline"
+            onClick={() => setSnapshotNoticeVisible(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <header
         className="relative overflow-hidden bg-linear-to-b from-slate-900 to-slate-800 pb-12 pt-16 text-white"
         style={heroBackgroundStyles}
@@ -1059,12 +1287,112 @@ export function MenuClient({
                 </select>
               </div>
             </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-3">
+                <p className="text-sm font-medium text-foreground">Allergens</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {[
+                    { key: "dairy", label: "Hide dairy" },
+                    { key: "nuts", label: "Hide nuts" },
+                    { key: "eggs", label: "Hide eggs" },
+                    { key: "shellfish", label: "Hide shellfish" },
+                    { key: "soy", label: "Hide soy" },
+                    { key: "sesame", label: "Hide sesame" },
+                  ].map((a) => (
+                    <label
+                      key={a.key}
+                      className="flex items-center gap-2 rounded-lg border border-border/60 px-2 py-1.5"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(hideAllergens as any)[a.key]}
+                        onChange={() => {
+                          setHideAllergens((prev) => {
+                            const next = { ...prev, [a.key]: !prev[a.key as keyof typeof prev] };
+                            logAnalyticsEvent({
+                              restaurantId: restaurant.id,
+                              branchId: branch.id,
+                              eventType: "allergen_filter_apply",
+                              language: languageRef.current,
+                              metadata: next,
+                            });
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>{a.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border bg-background/60 p-3">
+                <p className="text-sm font-medium text-foreground">Other filters</p>
+                <div className="flex flex-col gap-2 text-sm">
+                  <label className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                    <span>Featured only</span>
+                    <Switch
+                      checked={showFeaturedOnly}
+                      onCheckedChange={(checked) => {
+                        setShowFeaturedOnly(checked);
+                        logAnalyticsEvent({
+                          restaurantId: restaurant.id,
+                          branchId: branch.id,
+                          eventType: "featured_filter_apply",
+                          language: languageRef.current,
+                        });
+                      }}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                    <span>My favorites</span>
+                    <Switch
+                      checked={favoritesOnly}
+                      onCheckedChange={(checked) => {
+                        setFavoritesOnly(checked);
+                        logAnalyticsEvent({
+                          restaurantId: restaurant.id,
+                          branchId: branch.id,
+                          eventType: "favorites_filter_apply",
+                          language: languageRef.current,
+                        });
+                      }}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                    <span>Has customizations</span>
+                    <Switch
+                      checked={hasCustomizationsOnly}
+                      onCheckedChange={(checked) => {
+                        setHasCustomizationsOnly(checked);
+                        logAnalyticsEvent({
+                          restaurantId: restaurant.id,
+                          branchId: branch.id,
+                          eventType: "filter_toggle",
+                          language: languageRef.current,
+                          metadata: { hasCustomizationsOnly: checked },
+                        });
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
           )}
         </section>
         {displayCategories.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
-            {emptyMessage}
+          <div className="space-y-4 rounded-2xl border border-dashed bg-white/70 p-10 text-center text-base text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+            <p>{emptyMessage}</p>
+            <div className="flex flex-wrap justify-center gap-2 text-sm">
+              <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                Clear all filters
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleSearchClear}>
+                Reset search
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-10">
@@ -1072,6 +1400,160 @@ export function MenuClient({
           </div>
         )}
       </main>
+
+      <Dialog
+        open={Boolean(activeItem)}
+        onOpenChange={(open) => {
+          if (!open) closeItemModal(true);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          {activeItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center justify-between gap-2">
+                  <span>{getItemName(activeItem)}</span>
+                  {activeItem.is_featured && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" /> Featured
+                    </span>
+                  )}
+                </DialogTitle>
+                {getItemDescription(activeItem) && (
+                  <DialogDescription>{getItemDescription(activeItem)}</DialogDescription>
+                )}
+              </DialogHeader>
+              <div className="space-y-4">
+                {activeItem.image_url && (
+                  <div className="relative h-48 w-full overflow-hidden rounded-2xl">
+                    <Image
+                      src={activeItem.image_url}
+                      alt={getItemName(activeItem)}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-lg font-semibold">
+                    {formatPrice(activeItem.price, activeItem.primary_currency, language) ?? "--"}
+                    {activeItem.secondary_price && (
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        {formatPrice(
+                          activeItem.secondary_price,
+                          activeItem.secondary_currency,
+                          language
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1">{renderAllergenPills(activeItem)}</div>
+                </div>
+
+                {activeItem.modifiers?.length ? (
+                  <div className="space-y-3">
+                    {activeItem.modifiers.map((mod) => {
+                      const selected = modifierSelections[mod.id] ?? new Set<string>();
+
+                      const handleToggle = (optionId: string) => {
+                        setModifierSelections((prev) => {
+                          const current = new Set(prev[mod.id] ?? []);
+                          if (current.has(optionId)) {
+                            current.delete(optionId);
+                            logAnalyticsEvent({
+                              restaurantId: restaurant.id,
+                              branchId: branch.id,
+                              categoryId: activeItem.category_id,
+                              itemId: activeItem.id,
+                              eventType: "modifier_option_remove",
+                              language: languageRef.current,
+                              metadata: { modifierId: mod.id, optionId },
+                            });
+                          } else {
+                            current.add(optionId);
+                            logAnalyticsEvent({
+                              restaurantId: restaurant.id,
+                              branchId: branch.id,
+                              categoryId: activeItem.category_id,
+                              itemId: activeItem.id,
+                              eventType: "modifier_option_select",
+                              language: languageRef.current,
+                              metadata: { modifierId: mod.id, optionId },
+                            });
+                          }
+                          return { ...prev, [mod.id]: current };
+                        });
+                      };
+
+                      const count = selected.size;
+                      const min = mod.min_choices ?? 0;
+                      const max = mod.max_choices ?? mod.options.length;
+                      const maxed = count >= max;
+
+                      return (
+                        <div key={mod.id} className="rounded-2xl border p-3">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold">{mod.name}</p>
+                            <span className="text-xs text-muted-foreground">
+                              Choose {min} - {max}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {mod.options.map((opt) => {
+                              const active = selected.has(opt.id);
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => handleToggle(opt.id)}
+                                  disabled={!active && maxed}
+                                  className={cn(
+                                    "rounded-full border px-3 py-1 text-sm transition",
+                                    active
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-background hover:bg-muted",
+                                    !active && maxed && "opacity-60"
+                                  )}
+                                >
+                                  {opt.name}
+                                  {opt.price != null ? ` (+${opt.price})` : ""}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {count < min && (
+                            <p className="mt-1 text-xs text-amber-600">
+                              Please select at least {min} option{min > 1 ? "s" : ""}.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                <div className="flex justify-end">
+                  <Button
+                    disabled={
+                      activeItem.modifiers?.some((mod) => {
+                        const selCount = modifierSelections[mod.id]?.size ?? 0;
+                        const min = mod.min_choices ?? 0;
+                        const max = mod.max_choices ?? mod.options.length;
+                        return selCount < min || selCount > max;
+                      }) ?? false
+                    }
+                    onClick={() => {
+                      closeItemModal(true);
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <footer className="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
         {labels.footer}

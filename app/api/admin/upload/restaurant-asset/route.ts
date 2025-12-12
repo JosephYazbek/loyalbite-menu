@@ -48,7 +48,8 @@ function extractPathFromPublicUrl(url: string, expectedBucket: string) {
   if (idx === -1) return null;
 
   const afterMarker = url.slice(idx + marker.length);
-  const [bucket, ...pathParts] = afterMarker.split("/");
+  const withoutQuery = afterMarker.split("?")[0]?.split("#")[0] ?? "";
+  const [bucket, ...pathParts] = withoutQuery.split("/");
 
   if (bucket !== expectedBucket || pathParts.length === 0) {
     return null;
@@ -150,7 +151,9 @@ export async function POST(request: Request) {
       data: { publicUrl },
     } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
 
-    return NextResponse.json({ url: publicUrl });
+    const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`;
+
+    return NextResponse.json({ url: cacheBustedUrl });
   } catch (error) {
     console.error("[UPLOAD][restaurant-asset] unexpected", error);
     const message =

@@ -1,112 +1,28 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { loadAnalytics, AnalyticsRange } from "@/lib/analytics/loader";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { RangeSelector } from "./range-selector";
-import { ViewsChart, DailyViewPoint } from "./views-chart";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ViewsChart } from "./views-chart";
 
-type SearchParams = {
-  range?: string;
-};
+type SearchParams = { range?: string };
 
-type AnalyticsEvent = {
-  branch_id: string | null;
-  category_id: string | null;
-  item_id: string | null;
-  event_type: string;
-  device_type: string | null;
-  language: string | null;
-  session_id: string | null;
-  created_at: string;
-};
+export const dynamic = "force-dynamic";
 
-type BranchPerformanceRow = {
-  branchId: string;
-  branchName: string;
-  views: number;
-  share: number;
-};
-
-type TopCategoryRow = {
-  categoryId: string;
-  categoryName: string;
-  views: number;
-  share: number;
-};
-
-type TopItemRow = {
-  itemId: string;
-  itemName: string;
-  categoryName: string;
-  views: number;
-};
-
-const RANGE_VALUES = new Set(["7d", "30d", "all"]);
-const DEFAULT_RANGE: "7d" | "30d" | "all" = "7d";
-
-function resolveRange(value: string | undefined): "7d" | "30d" | "all" {
-  if (!value || !RANGE_VALUES.has(value)) return DEFAULT_RANGE;
-  return value as "7d" | "30d" | "all";
-}
-
-const getRangeStartDate = (range: "7d" | "30d" | "all") => {
-  if (range === "all") return null;
-  const days = range === "7d" ? 6 : 29;
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
-  base.setDate(base.getDate() - days);
-  return base;
-};
-
-const formatDateLabel = (date: Date) =>
-  date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-const buildDailySeries = (map: Map<string, number>, start: Date | null): DailyViewPoint[] => {
-  if (!map.size && !start) return [];
-  if (!start) {
-    return Array.from(map.entries())
-      .sort(([a], [b]) => (a > b ? 1 : -1))
-      .map(([key, count]) => ({
-        date: formatDateLabel(new Date(`${key}T00:00:00Z`)),
-        count,
-      }));
-  }
-
-  const series: DailyViewPoint[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cursor = new Date(start);
-
-  while (cursor <= today) {
-    const key = cursor.toISOString().slice(0, 10);
-    series.push({
-      date: formatDateLabel(cursor),
-      count: map.get(key) ?? 0,
-    });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return series;
-};
-
-type AnalyticsPageProps = {
-  searchParams: Promise<SearchParams>;
-};
-
-export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
-  const { range } = await searchParams;
-  const rangeValue = resolveRange(range);
-  const startDate = getRangeStartDate(rangeValue);
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const params = await searchParams;
+  const rangeParam = typeof params?.range === "string" ? params.range : undefined;
+  const rangeValue = (["7d", "30d", "90d", "all"].includes(rangeParam ?? "")
+    ? rangeParam
+    : "7d") as AnalyticsRange;
 
   const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: membership } = await supabase
     .from("restaurant_users")
@@ -115,336 +31,162 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     .maybeSingle();
 
   const restaurantId = membership?.restaurant_id;
-  if (!restaurantId) {
-    redirect("/admin");
-  }
+  if (!restaurantId) redirect("/admin");
 
-  const eventsQuery = supabase
-    .from("analytics_events")
-    .select(
-      "branch_id, category_id, item_id, event_type, device_type, language, session_id, created_at"
-    )
-    .eq("restaurant_id", restaurantId)
-    .order("created_at", { ascending: true });
+  const { data: restaurant } = await supabase
+    .from("restaurants")
+    .select("id, name")
+    .eq("id", restaurantId)
+    .maybeSingle();
+  if (!restaurant) redirect("/admin");
 
-  if (startDate) {
-    eventsQuery.gte("created_at", startDate.toISOString());
-  }
-
-  const [{ data: restaurant }, { data: events }, { data: branches }, { data: categories }, { data: items }] =
-    await Promise.all([
-      supabase.from("restaurants").select("id, name").eq("id", restaurantId).maybeSingle(),
-      eventsQuery,
-      supabase.from("branches").select("id, name").eq("restaurant_id", restaurantId),
-      supabase.from("categories").select("id, name_en, is_offers").eq("restaurant_id", restaurantId),
-      supabase.from("items").select("id, name_en, category_id").eq("restaurant_id", restaurantId),
-    ]);
-
-  if (!restaurant) {
-    redirect("/admin");
-  }
-
-  const branchMap = new Map<string, string>((branches ?? []).map((branch) => [branch.id, branch.name]));
-  const categoryMap = new Map<string, { name: string; isOffers: boolean }>(
-    (categories ?? []).map((category) => [
-      category.id,
-      {
-        name: category.name_en ?? "Uncategorized",
-        isOffers: Boolean(category.is_offers),
-      },
-    ])
-  );
-  const offerCategoryIds = new Set(
-    (categories ?? [])
-      .filter((category) => category.is_offers)
-      .map((category) => category.id)
-  );
-  const itemMap = new Map<string, { name: string; categoryId: string | null }>(
-    (items ?? []).map((item) => [
-      item.id,
-      { name: item.name_en ?? "Unnamed", categoryId: item.category_id },
-    ])
-  );
-
-  const analyticsEvents: AnalyticsEvent[] = events ?? [];
-  let offerSectionViews = 0;
-  let offerItemViews = 0;
-  analyticsEvents.forEach((event) => {
-    if (!event.category_id || !offerCategoryIds.has(event.category_id)) {
-      return;
-    }
-    if (event.event_type === "category_view") {
-      offerSectionViews += 1;
-    }
-    if (event.event_type === "item_view") {
-      offerItemViews += 1;
-    }
-  });
-
-  const menuViews = analyticsEvents.filter((event) => event.event_type === "menu_view");
-  const totalMenuViews = menuViews.length;
-  const whatsappClicks = analyticsEvents.filter((event) => event.event_type === "whatsapp_click").length;
-
-  const dailyMap = new Map<string, number>();
-  menuViews.forEach((event) => {
-    const key = new Date(event.created_at).toISOString().slice(0, 10);
-    dailyMap.set(key, (dailyMap.get(key) ?? 0) + 1);
-  });
-  const dailySeries = buildDailySeries(dailyMap, startDate);
-
-  const branchCounts = new Map<string, number>();
-  menuViews.forEach((event) => {
-    if (!event.branch_id) return;
-    branchCounts.set(event.branch_id, (branchCounts.get(event.branch_id) ?? 0) + 1);
-  });
-  const branchRows: BranchPerformanceRow[] = Array.from(branchCounts.entries())
-    .map(([branchId, views]) => ({
-      branchId,
-      branchName: branchMap.get(branchId) ?? "Unknown branch",
-      views,
-      share: totalMenuViews ? views / totalMenuViews : 0,
-    }))
-    .sort((a, b) => b.views - a.views);
-
-  const categoryCounts = new Map<string, number>();
-  analyticsEvents.forEach((event) => {
-    if (
-      (event.event_type === "category_view" || event.event_type === "item_view") &&
-      event.category_id
-    ) {
-      categoryCounts.set(event.category_id, (categoryCounts.get(event.category_id) ?? 0) + 1);
-    }
-  });
-  const totalCategoryViews = Array.from(categoryCounts.values()).reduce((sum, val) => sum + val, 0);
-  const topCategories: TopCategoryRow[] = Array.from(categoryCounts.entries())
-    .map(([categoryId, views]) => ({
-      categoryId,
-      categoryName: categoryMap.get(categoryId)?.name ?? "Uncategorized",
-      views,
-      share: totalCategoryViews ? views / totalCategoryViews : 0,
-    }))
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 5);
-
-  const itemCounts = new Map<string, number>();
-  analyticsEvents.forEach((event) => {
-    if (event.event_type === "item_view" && event.item_id) {
-      itemCounts.set(event.item_id, (itemCounts.get(event.item_id) ?? 0) + 1);
-    }
-  });
-  const topItems: TopItemRow[] = Array.from(itemCounts.entries())
-    .map(([itemId, views]) => {
-      const meta = itemMap.get(itemId);
-      return {
-        itemId,
-        itemName: meta?.name ?? "Unknown",
-        categoryName: meta?.categoryId
-          ? categoryMap.get(meta.categoryId)?.name ?? "Uncategorized"
-          : "Uncategorized",
-        views,
-      };
-    })
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 10);
-
-  const sessionSet = new Set(analyticsEvents.map((event) => event.session_id).filter(Boolean) as string[]);
-  const uniqueSessions = sessionSet.size || totalMenuViews;
-
-  const deviceCounts = menuViews.reduce(
-    (acc, event) => {
-      if (event.device_type === "mobile") acc.mobile += 1;
-      else if (event.device_type === "desktop") acc.desktop += 1;
-      return acc;
-    },
-    { mobile: 0, desktop: 0 }
-  );
-
-  const languageCounts = menuViews.reduce<Record<string, number>>((acc, event) => {
-    const key = event.language ?? "unknown";
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const mostUsedLanguage = Object.entries(languageCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "unknown";
-  const languageLabel =
-    mostUsedLanguage === "ar" ? "Arabic" : mostUsedLanguage === "en" ? "English" : "Unknown";
-
-  const mobilePercentage = totalMenuViews > 0 ? Math.round((deviceCounts.mobile / totalMenuViews) * 100) : 0;
-
-  const deviceBreakdown = [
-    {
-      label: "Mobile",
-      value: deviceCounts.mobile,
-      percentage: totalMenuViews > 0 ? Math.round((deviceCounts.mobile / totalMenuViews) * 100) : 0,
-    },
-    {
-      label: "Desktop",
-      value: deviceCounts.desktop,
-      percentage: totalMenuViews > 0 ? Math.round((deviceCounts.desktop / totalMenuViews) * 100) : 0,
-    },
-  ];
-
-  const languageBreakdown = Object.entries(languageCounts).map(([key, value]) => ({
-    label: key === "ar" ? "Arabic" : key === "en" ? "English" : "Unknown",
-    value,
-  }));
+  const analytics = await loadAnalytics({ restaurantId, range: rangeValue });
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6">
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Insights</p>
-            <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-            <p className="text-sm text-muted-foreground">How customers interact with your menu.</p>
-            <p className="text-xs text-muted-foreground">Restaurant: {restaurant.name}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <RangeSelector value={rangeValue} />
-          </div>
+    <div className="mx-auto w-full max-w-7xl px-6 py-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Insights</p>
+          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground">How customers interact with your menu.</p>
+          <p className="text-xs text-muted-foreground">Restaurant: {restaurant.name}</p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <RangeSelector value={rangeValue} />
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/menu/health">Menu health</Link>
+          </Button>
+        </div>
+      </header>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <KpiCard title="Menu views" value={totalMenuViews} />
-          <KpiCard title="Unique sessions" value={uniqueSessions} />
-          <KpiCard title="Most used language" value={languageLabel} />
-          <KpiCard title="Mobile traffic" value={`${mobilePercentage}%`} />
-          <KpiCard title="WhatsApp clicks" value={whatsappClicks} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <KpiCard title="Offer section views" value={offerSectionViews} />
-          <KpiCard title="Offer item views" value={offerItemViews} />
-        </div>
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <KpiCard title="Menu views" value={analytics.kpis.menu_views} />
+        <KpiCard title="Unique sessions" value={analytics.kpis.unique_sessions} />
+        <KpiCard title="Category clicks" value={analytics.kpis.category_views} />
+        <KpiCard title="Item views" value={analytics.kpis.item_views} />
+        <KpiCard title="Modal opens" value={analytics.kpis.item_modal_opens} />
+      </section>
+      <section className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard title="Favorites added" value={analytics.kpis.favorites} />
+        <KpiCard title="Filters applied" value={analytics.kpis.filters} />
+        <KpiCard title="Searches" value={analytics.kpis.searches} />
+        <KpiCard title="Snapshot loads" value={analytics.kpis.snapshots} />
+      </section>
 
-        <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Views over time</h2>
-              <p className="text-sm text-muted-foreground">Menu views per day in the selected range.</p>
-            </div>
-          </div>
-          {dailySeries.length === 0 ? (
-            <EmptyState message="No views recorded yet for this period." />
+      <SectionCard title="Views over time" subtitle="Menu views per day in the selected range.">
+        {analytics.viewsSeries.length === 0 ? (
+          <EmptyState message="No views yet." />
+        ) : (
+          <ViewsChart data={analytics.viewsSeries} />
+        )}
+      </SectionCard>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <SectionCard title="Device & language">
+          {analytics.devices.every((d) => d.value === 0) ? (
+            <EmptyState message="No device data yet." />
           ) : (
-            <ViewsChart data={dailySeries} />
-          )}
-        </section>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Menu health</h2>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/admin/menu/health">View details</Link>
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Track how complete and effective your menu is compared to best practices.
-            </p>
-          </section>
-
-          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">Branch performance</h2>
-            {branchRows.length === 0 ? (
-              <EmptyState message="No branch data yet." />
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="text-muted-foreground">
-                  <tr>
-                    <th className="py-2 text-left">Branch</th>
-                    <th className="py-2 text-right">Views</th>
-                    <th className="py-2 text-right">Share</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {branchRows.map((row) => (
-                    <tr key={row.branchId} className="border-t border-border/60">
-                      <td className="py-2 font-medium text-foreground">{row.branchName}</td>
-                      <td className="py-2 text-right">{row.views}</td>
-                      <td className="py-2 text-right">{Math.round(row.share * 100)}%</td>
-                    </tr>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Device split</p>
+                <div className="mt-2 space-y-2">
+                  {analytics.devices.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex items-center justify-between rounded-2xl border border-border px-3 py-2"
+                    >
+                      <span className="font-medium text-foreground">{row.label}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {row.value} (
+                        {analytics.kpis.menu_views > 0
+                          ? Math.round((row.value / analytics.kpis.menu_views) * 100)
+                          : 0}
+                        %)
+                      </span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">Device & language</h2>
-            {totalMenuViews === 0 ? (
-              <EmptyState message="No device data yet." />
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Device split</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Languages</p>
+                {analytics.languages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No language data yet.</p>
+                ) : (
                   <div className="mt-2 space-y-2">
-                    {deviceBreakdown.map((row) => (
+                    {analytics.languages.map((row) => (
                       <div
                         key={row.label}
                         className="flex items-center justify-between rounded-2xl border border-border px-3 py-2"
                       >
-                        <span className="font-medium text-foreground">{row.label}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {row.value} ({row.percentage}%)
+                        <span className="font-medium text-foreground">
+                          {row.label === "ar" ? "Arabic" : row.label === "en" ? "English" : row.label}
                         </span>
+                        <span className="text-sm text-muted-foreground">{row.value}</span>
                       </div>
                     ))}
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Languages</p>
-                  {languageBreakdown.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No language data yet.</p>
-                  ) : (
-                    <div className="mt-2 space-y-2">
-                      {languageBreakdown.map((row) => (
-                        <div
-                          key={row.label}
-                          className="flex items-center justify-between rounded-2xl border border-border px-3 py-2"
-                        >
-                          <span className="font-medium text-foreground">{row.label}</span>
-                          <span className="text-sm text-muted-foreground">{row.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-            )}
-          </section>
+            </div>
+          )}
+        </SectionCard>
 
-          <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">Top categories</h2>
-            {topCategories.length === 0 ? (
-              <EmptyState message="No category interactions yet." />
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="text-muted-foreground">
-                  <tr>
-                    <th className="py-2 text-left">Category</th>
-                    <th className="py-2 text-right">Views</th>
-                    <th className="py-2 text-right">Share</th>
+        <SectionCard title="Top search terms">
+          {analytics.topSearchTerms.length === 0 ? (
+            <EmptyState message="No search data yet." />
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-2 text-left">Term</th>
+                  <th className="py-2 text-right">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.topSearchTerms.map((row) => (
+                  <tr key={row.term} className="border-t border-border/60">
+                    <td className="py-2 font-medium text-foreground">{row.term}</td>
+                    <td className="py-2 text-right">{row.count}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {topCategories.map((row) => (
-                    <tr key={row.categoryId} className="border-t border-border/60">
-                      <td className="py-2 font-medium text-foreground">{row.categoryName}</td>
-                      <td className="py-2 text-right">{row.views}</td>
-                      <td className="py-2 text-right">{Math.round(row.share * 100)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </SectionCard>
+      </div>
 
-        <section className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">Top items</h2>
-          {topItems.length === 0 ? (
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <SectionCard title="Top categories">
+          {analytics.categories.length === 0 ? (
+            <EmptyState message="No category interactions yet." />
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-2 text-left">Category</th>
+                  <th className="py-2 text-right">Views</th>
+                  <th className="py-2 text-right">Modal opens</th>
+                  <th className="py-2 text-right">Favorites</th>
+                  <th className="py-2 text-right">Engagement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.categories.map((row) => (
+                  <tr key={row.id} className="border-t border-border/60">
+                    <td className="py-2 font-medium text-foreground">{row.name}</td>
+                    <td className="py-2 text-right">{row.views}</td>
+                    <td className="py-2 text-right">{row.modalOpens}</td>
+                    <td className="py-2 text-right">{row.favorites}</td>
+                    <td className="py-2 text-right">{row.engagement}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Top items">
+          {analytics.topItems.length === 0 ? (
             <EmptyState message="No item interactions yet." />
           ) : (
             <table className="w-full text-sm">
@@ -453,24 +195,193 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   <th className="py-2 text-left">Item</th>
                   <th className="py-2 text-left">Category</th>
                   <th className="py-2 text-right">Views</th>
+                  <th className="py-2 text-right">Modal opens</th>
+                  <th className="py-2 text-right">Favorites</th>
+                  <th className="py-2 text-right">Featured views</th>
+                  <th className="py-2 text-right">Popularity</th>
                 </tr>
               </thead>
               <tbody>
-                {topItems.map((row) => (
-                  <tr key={row.itemId} className="border-t border-border/60">
-                    <td className="py-2 font-medium text-foreground">{row.itemName}</td>
-                    <td className="py-2 text-left text-muted-foreground">{row.categoryName}</td>
+                {analytics.topItems.map((row) => (
+                  <tr key={row.id} className="border-t border-border/60">
+                    <td className="py-2 font-medium text-foreground">{row.name}</td>
+                    <td className="py-2 text-left text-muted-foreground">{row.category}</td>
                     <td className="py-2 text-right">{row.views}</td>
+                    <td className="py-2 text-right">{row.modalOpens}</td>
+                    <td className="py-2 text-right">{row.favorites}</td>
+                    <td className="py-2 text-right">{row.featuredViews}</td>
+                    <td className="py-2 text-right">{row.popularity}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-        </section>
+        </SectionCard>
       </div>
+
+      <SectionCard title="Favorites insights" className="mt-6">
+        {analytics.favoritesLeaderboard.length === 0 ? (
+          <EmptyState message="No favorites yet." />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Most favorited items</h3>
+              <table className="mt-2 w-full text-sm">
+                <thead className="text-muted-foreground">
+                  <tr>
+                    <th className="py-2 text-left">Item</th>
+                    <th className="py-2 text-left">Category</th>
+                    <th className="py-2 text-right">Favorites</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analytics.favoritesLeaderboard.map((row) => (
+                    <tr key={row.id} className="border-t border-border/60">
+                      <td className="py-2 font-medium text-foreground">{row.name}</td>
+                      <td className="py-2 text-left text-muted-foreground">{row.category}</td>
+                      <td className="py-2 text-right">{row.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Favorites over time</h3>
+              {analytics.favoritesSeries.length === 0 ? (
+                <EmptyState message="No favorite activity yet." />
+              ) : (
+                <ViewsChart data={analytics.favoritesSeries} />
+              )}
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Featured item performance" className="mt-6">
+        {analytics.featured.length === 0 ? (
+          <EmptyState message="No featured items activity yet." />
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="py-2 text-left">Item</th>
+                <th className="py-2 text-right">Views</th>
+                <th className="py-2 text-right">Opens</th>
+                <th className="py-2 text-right">Favorites</th>
+                <th className="py-2 text-right">Engagement</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics.featured.map((row) => (
+                <tr key={row.id} className="border-t border-border/60">
+                  <td className="py-2 font-medium text-foreground">{row.name}</td>
+                  <td className="py-2 text-right">{row.views}</td>
+                  <td className="py-2 text-right">{row.opens}</td>
+                  <td className="py-2 text-right">{row.favorites}</td>
+                  <td className="py-2 text-right">{row.engagement}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Allergen avoidance" className="mt-6">
+        {analytics.allergens.every((a) => a.count === 0) ? (
+          <EmptyState message="No allergen filter usage yet." />
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {analytics.allergens.map((row) => (
+              <div
+                key={row.allergen}
+                className="flex items-center justify-between rounded-2xl border border-border px-3 py-2 text-sm"
+              >
+                <span className="font-medium capitalize text-foreground">{row.allergen}</span>
+                <span className="text-muted-foreground">{row.count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Modifier engagement" className="mt-6">
+        {analytics.modifiers.length === 0 ? (
+          <EmptyState message="No modifier interactions yet." />
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="py-2 text-left">Modifier group</th>
+                <th className="py-2 text-right">Group opens</th>
+                <th className="py-2 text-right">Option selects</th>
+                <th className="py-2 text-right">Option removes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics.modifiers.map((row) => (
+                <tr key={row.id} className="border-t border-border/60">
+                  <td className="py-2 font-medium text-foreground">{row.id}</td>
+                  <td className="py-2 text-right">{row.opens}</td>
+                  <td className="py-2 text-right">{row.selects}</td>
+                  <td className="py-2 text-right">{row.removes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Funnels" className="mt-6">
+        <div className="grid gap-4 md:grid-cols-2">
+          {[analytics.funnels.funnelA, analytics.funnels.funnelB].map((funnel, idx) => (
+            <div key={idx} className="space-y-2 rounded-2xl border border-border p-4">
+              {funnel.map((step, index) => {
+                const prev = index === 0 ? step.value : funnel[index - 1].value;
+                const pct = prev > 0 ? Math.round((step.value / prev) * 100) : 0;
+                return (
+                  <div key={step.label} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-foreground">{step.label}</span>
+                      <span className="text-muted-foreground">
+                        {step.value} {index > 0 ? `(${pct}%)` : ""}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full bg-primary transition-all"
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </SectionCard>
     </div>
   );
 }
+
+const SectionCard = ({
+  title,
+  children,
+  subtitle,
+  className,
+}: {
+  title: string;
+  subtitle?: string;
+  className?: string;
+  children: React.ReactNode;
+}) => (
+  <section className={`mt-6 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm ${className ?? ""}`}>
+    <div>
+      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
+    </div>
+    {children}
+  </section>
+);
 
 type KpiCardProps = {
   title: string;

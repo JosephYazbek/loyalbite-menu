@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { ProfileForm } from "./profile-form";
+import { Button } from "@/components/ui/button";
 
 export default async function ProfileSettingsPage() {
   const supabase = await createSupabaseServerClient();
@@ -56,17 +58,22 @@ export default async function ProfileSettingsPage() {
   return (
     <div className="mx-auto w-full max-w-7xl px-6">
       <div className="space-y-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Settings
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground">
-          Restaurant profile & branding
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Update your public-facing details, contact info, and menu accents.
-        </p>
-      </div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Settings
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-foreground">
+              Restaurant profile & branding
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Update your public-facing details, contact info, and menu accents.
+            </p>
+          </div>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/admin/settings">← Back to settings</Link>
+          </Button>
+        </div>
 
         <ProfileForm
           restaurant={{

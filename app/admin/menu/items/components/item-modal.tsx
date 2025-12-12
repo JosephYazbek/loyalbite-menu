@@ -44,12 +44,21 @@ export type ItemFormValues = {
   is_vegetarian: boolean;
   is_vegan: boolean;
   is_gluten_free: boolean;
+  contains_dairy: boolean;
+  contains_nuts: boolean;
+  contains_eggs: boolean;
+  contains_shellfish: boolean;
+  contains_soy: boolean;
+  contains_sesame: boolean;
+  is_featured: boolean;
+  recommendation_score: number | string | null;
 
   is_visible: boolean;
   is_available: boolean;
 
   item_code: string;
   display_order: number;
+  selectedModifierIds: string[];
 };
 
 const EMPTY_VALUES: ItemFormValues = {
@@ -70,10 +79,19 @@ const EMPTY_VALUES: ItemFormValues = {
   is_vegetarian: false,
   is_vegan: false,
   is_gluten_free: false,
+  contains_dairy: false,
+  contains_nuts: false,
+  contains_eggs: false,
+  contains_shellfish: false,
+  contains_soy: false,
+  contains_sesame: false,
+  is_featured: false,
+  recommendation_score: null,
   is_visible: true,
   is_available: true,
   item_code: "",
   display_order: 0,
+  selectedModifierIds: [],
 };
 
 type ItemModalProps = {
@@ -81,6 +99,7 @@ type ItemModalProps = {
   onClose: () => void;
   mode: "create" | "edit";
   categories: any[];
+  modifiers?: any[];
   initialValues?: ItemFormValues;
   onSubmit: (
     values: ItemFormValues,
@@ -113,6 +132,7 @@ export default function ItemModal({
   onClose,
   mode,
   categories,
+  modifiers = [],
   initialValues,
   onSubmit,
   loading,
@@ -205,6 +225,18 @@ export default function ItemModal({
       ...prev,
       [key]: !prev[key],
     }));
+  };
+
+  const toggleModifier = (modifierId: string) => {
+    setValues((prev) => {
+      const exists = prev.selectedModifierIds.includes(modifierId);
+      return {
+        ...prev,
+        selectedModifierIds: exists
+          ? prev.selectedModifierIds.filter((id) => id !== modifierId)
+          : [...prev.selectedModifierIds, modifierId],
+      };
+    });
   };
 
   const triggerFilePicker = () => {
@@ -603,6 +635,146 @@ export default function ItemModal({
               })}
             </div>
           </div>
+
+          {/* Featured & scoring */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Featured item</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Highlight this item in featured strips.
+                  </p>
+                </div>
+                <Switch
+                  checked={values.is_featured}
+                  onCheckedChange={handleToggle("is_featured")}
+                  disabled={disableInteractions}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="recommendation_score">
+                Recommendation score
+              </Label>
+              <Input
+                id="recommendation_score"
+                type="number"
+                min="0"
+                max="100"
+                value={values.recommendation_score ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({
+                    ...prev,
+                    recommendation_score:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                placeholder="e.g. 80"
+                disabled={disableInteractions}
+              />
+              <p className="text-xs text-muted-foreground">
+                Higher scores surface first in featured lists.
+              </p>
+            </div>
+          </div>
+
+          {/* Allergens */}
+          <div className="space-y-2">
+            <Label>Allergens</Label>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {[
+                { key: "contains_dairy", label: "Dairy" },
+                { key: "contains_nuts", label: "Nuts" },
+                { key: "contains_eggs", label: "Eggs" },
+                { key: "contains_shellfish", label: "Shellfish" },
+                { key: "contains_soy", label: "Soy" },
+                { key: "contains_sesame", label: "Sesame" },
+              ].map((allergen) => (
+                <label
+                  key={allergen.key}
+                  className="flex items-center gap-2 rounded-md border p-2 text-sm"
+                >
+                  <Switch
+                    checked={(values as any)[allergen.key]}
+                    onCheckedChange={(checked) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        [allergen.key]: checked,
+                      }))
+                    }
+                    disabled={disableInteractions}
+                  />
+                  <span>{allergen.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Modifiers */}
+          {modifiers.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Add-ons / Modifier groups</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select the groups that apply to this item.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {modifiers.map((modifier: any) => {
+                  const checked = values.selectedModifierIds.includes(
+                    modifier.id
+                  );
+                  const min = modifier.min_choices ?? 0;
+                  const max = modifier.max_choices ?? 1;
+                  return (
+                    <label
+                      key={modifier.id}
+                      className={cn(
+                        "flex cursor-pointer flex-col gap-2 rounded-lg border p-3 transition",
+                        checked ? "border-primary bg-primary/5" : "bg-background"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleModifier(modifier.id)}
+                            disabled={disableInteractions}
+                            className="h-4 w-4"
+                          />
+                          <span className="font-medium">{modifier.name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {min}-{max} choices
+                        </span>
+                      </div>
+                      {modifier.options?.length ? (
+                        <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
+                          {modifier.options.map((opt: any) => (
+                            <span
+                              key={opt.id}
+                              className="rounded-full bg-muted px-2 py-0.5"
+                            >
+                              {opt.name}
+                              {opt.price != null ? ` (+${opt.price})` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          No options added yet.
+                        </p>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2">

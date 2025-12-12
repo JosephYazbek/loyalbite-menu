@@ -6,18 +6,19 @@ import { Button } from "@/components/ui/button";
 const ranges = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
   { value: "all", label: "All time" },
 ];
 
 type RangeSelectorProps = {
-  value: "7d" | "30d" | "all";
+  value: "7d" | "30d" | "90d" | "all";
 };
 
 export function RangeSelector({ value }: RangeSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const handleSelect = (nextValue: "7d" | "30d" | "all") => {
+  const handleSelect = (nextValue: "7d" | "30d" | "90d" | "all") => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("range", nextValue);
     const query = params.toString();

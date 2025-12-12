@@ -15,6 +15,8 @@ import { getPublicMenuUrl } from "@/lib/public-menu";
 type ItemsClientProps = {
   categories: any[];
   items: any[];
+  modifiers?: any[];
+  itemModifiers?: Record<string, any[]>;
   branches?: Array<{
     id: string;
     name: string;
@@ -29,10 +31,19 @@ export default function ItemsClient({
   categories,
   items: initialItems,
   branches = [],
+  modifiers: _modifiers = [],
+  itemModifiers: initialItemModifiers = {},
   restaurantSlug,
   restaurantDefaultLanguage = "en",
 }: ItemsClientProps) {
   const [items, setItems] = useState(initialItems);
+  const [modifiers, setModifiers] = useState(_modifiers);
+  const [itemModifiers, setItemModifiers] = useState<Record<string, any[]>>(
+    initialItemModifiers
+  );
+  const [sortMode, setSortMode] = useState<"order" | "recommendation">(
+    "order"
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [editingItem, setEditingItem] = useState<any | null>(null);
@@ -50,6 +61,26 @@ export default function ItemsClient({
   }, [categories]);
 
   const canInteract = !(saving || uploadingImage || reordering);
+  const canReorder = canInteract && sortMode === "order";
+
+  const sortedItems = useMemo(() => {
+    const copy = [...items];
+    if (sortMode === "recommendation") {
+      return copy.sort((a, b) => {
+        const aScore =
+          a.recommendation_score != null ? Number(a.recommendation_score) : -Infinity;
+        const bScore =
+          b.recommendation_score != null ? Number(b.recommendation_score) : -Infinity;
+        if (a.is_featured && !b.is_featured) return -1;
+        if (b.is_featured && !a.is_featured) return 1;
+        if (bScore !== aScore) return bScore - aScore;
+        return (a.display_order ?? 0) - (b.display_order ?? 0);
+      });
+    }
+    return copy.sort(
+      (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+    );
+  }, [items, sortMode]);
 
   useEffect(() => {
     const initialId =
@@ -219,13 +250,13 @@ export default function ItemsClient({
     event: React.DragEvent<HTMLTableRowElement>,
     itemId: string
   ) => {
-    if (!canInteract) return;
+    if (!canReorder) return;
     event.dataTransfer.effectAllowed = "move";
     setDraggingItemId(itemId);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLTableRowElement>) => {
-    if (!draggingItemId || !canInteract) return;
+    if (!draggingItemId || !canReorder) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   };
@@ -235,7 +266,7 @@ export default function ItemsClient({
     targetId: string
   ) => {
     event.preventDefault();
-    if (!canInteract) return;
+    if (!canReorder) return;
     reorderItems(targetId);
   };
 
@@ -280,12 +311,24 @@ export default function ItemsClient({
             ? Number(values.calories)
             : null,
         image_url: values.image_url || null,
+        contains_dairy: !!values.contains_dairy,
+        contains_nuts: !!values.contains_nuts,
+        contains_eggs: !!values.contains_eggs,
+        contains_shellfish: !!values.contains_shellfish,
+        contains_soy: !!values.contains_soy,
+        contains_sesame: !!values.contains_sesame,
         is_new: values.is_new,
         is_popular: values.is_popular,
         is_spicy: values.is_spicy,
         is_vegetarian: values.is_vegetarian,
         is_vegan: values.is_vegan,
         is_gluten_free: values.is_gluten_free,
+        is_featured: values.is_featured,
+        recommendation_score:
+          values.recommendation_score === "" ||
+          values.recommendation_score === null
+            ? null
+            : Number(values.recommendation_score),
         is_visible: values.is_visible,
         is_available: values.is_available,
         item_code: values.item_code || null,
@@ -339,6 +382,20 @@ export default function ItemsClient({
           } finally {
             setUploadingImage(false);
           }
+        }
+
+        if (values.selectedModifierIds) {
+          await fetch(`/api/admin/items/${createdItem.id}/modifiers`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ modifierIds: values.selectedModifierIds }),
+          });
+          setItemModifiers((prev) => ({
+            ...prev,
+            [createdItem.id]: modifiers.filter((m: any) =>
+              values.selectedModifierIds.includes(m.id)
+            ),
+          }));
         }
 
         setItems((prev) => [...prev, createdItem]);
@@ -395,6 +452,20 @@ export default function ItemsClient({
           return;
         }
 
+        if (values.selectedModifierIds) {
+          await fetch(`/api/admin/items/${editingItem.id}/modifiers`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ modifierIds: values.selectedModifierIds }),
+          });
+          setItemModifiers((prev) => ({
+            ...prev,
+            [editingItem.id]: modifiers.filter((m: any) =>
+              values.selectedModifierIds.includes(m.id)
+            ),
+          }));
+        }
+
         setItems((prev) =>
           prev.map((it) => (it.id === editingItem.id ? data.item : it))
         );
@@ -436,10 +507,19 @@ export default function ItemsClient({
           is_vegetarian: !!editingItem.is_vegetarian,
           is_vegan: !!editingItem.is_vegan,
           is_gluten_free: !!editingItem.is_gluten_free,
+          contains_dairy: !!editingItem.contains_dairy,
+          contains_nuts: !!editingItem.contains_nuts,
+          contains_eggs: !!editingItem.contains_eggs,
+          contains_shellfish: !!editingItem.contains_shellfish,
+          contains_soy: !!editingItem.contains_soy,
+          contains_sesame: !!editingItem.contains_sesame,
+          is_featured: !!editingItem.is_featured,
+          recommendation_score: editingItem.recommendation_score ?? "",
           is_visible: !!editingItem.is_visible,
           is_available: !!editingItem.is_available,
           item_code: editingItem.item_code || "",
           display_order: editingItem.display_order ?? 0,
+          selectedModifierIds: itemModifiers[editingItem.id]?.map((m) => m.id) ?? [],
         }
       : undefined;
 
@@ -476,6 +556,22 @@ export default function ItemsClient({
                   {!branch.is_active ? " (inactive)" : ""}
                 </option>
               ))}
+              </select>
+            </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground min-w-0">
+            <span className="text-xs font-medium uppercase tracking-wide">
+              Sort
+            </span>
+            <select
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              value={sortMode}
+              onChange={(event) =>
+                setSortMode(event.target.value as "order" | "recommendation")
+              }
+            >
+              <option value="order">Display order</option>
+              <option value="recommendation">Recommendation score</option>
             </select>
           </div>
 
@@ -552,7 +648,7 @@ export default function ItemsClient({
           </thead>
 
           <tbody className="divide-y">
-            {items.map((item) => {
+            {sortedItems.map((item) => {
               const category = categories.find(
                 (c) => c.id === item.category_id
               );
@@ -561,7 +657,7 @@ export default function ItemsClient({
               return (
                 <tr
                   key={item.id}
-                  draggable={canInteract}
+                  draggable={canReorder}
                   onDragStart={(event) => handleDragStart(event, item.id)}
                   onDragOver={handleDragOver}
                   onDrop={(event) => handleDrop(event, item.id)}
@@ -642,6 +738,11 @@ export default function ItemsClient({
                   {/* TAGS */}
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
+                      {item.is_featured && (
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
+                          Featured
+                        </span>
+                      )}
                       {item.is_new && (
                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
                           New
@@ -732,6 +833,7 @@ export default function ItemsClient({
         initialValues={modalInitialValues}
         loading={saving}
         uploadingImage={uploadingImage}
+        modifiers={modifiers}
         onClose={() => {
           if (!saving && !uploadingImage) {
             setModalOpen(false);
