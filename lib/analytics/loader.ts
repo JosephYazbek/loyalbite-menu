@@ -7,6 +7,14 @@ export type AnalyticsResult = {
   viewsSeries: Array<{ date: string; count: number }>;
   favoritesSeries: Array<{ date: string; count: number }>;
   topSearchTerms: Array<{ term: string; count: number }>;
+  searchZeroResults: Array<{ term: string; count: number }>;
+  searchConversion: {
+    totalSearches: number;
+    zeroResults: number;
+    zeroRate: number;
+    favoriteRate: number;
+    viewRate: number;
+  };
   categories: Array<{
     id: string;
     name: string;
@@ -34,14 +42,18 @@ export type AnalyticsResult = {
     favorites: number;
     engagement: number;
   }>;
-  allergens: Array<{ allergen: string; count: number }>;
-  modifiers: Array<{ id: string; opens: number; selects: number; removes: number }>;
+  allergens: Array<{ allergen: string; count: number; percent: number }>;
+  allergenHeatmap: Array<{ category: string; allergen: string; count: number }>;
+  modifiers: Array<{ id: string; name: string; opens: number; selects: number; removes: number }>;
+  modifierItems: Array<{ id: string; name: string; opens: number; selects: number; removes: number }>;
   funnels: {
     funnelA: Array<{ label: string; value: number }>;
     funnelB: Array<{ label: string; value: number }>;
   };
   devices: Array<{ label: string; value: number }>;
+  deviceTrends?: Array<{ label: string; value: number }>;
   languages: Array<{ label: string; value: number }>;
+  languageTrends?: Array<{ label: string; value: number }>;
 };
 
 const getRangeStart = (range: AnalyticsRange) => {
@@ -53,16 +65,66 @@ const getRangeStart = (range: AnalyticsRange) => {
   return base.toISOString();
 };
 
-const buildSeries = (events: Array<{ created_at: string }>) => {
+const getWindowDays = (range: AnalyticsRange) => {
+  switch (range) {
+    case "7d":
+      return 7;
+    case "30d":
+      return 30;
+    case "90d":
+      return 90;
+    default:
+      return 0;
+  }
+};
+
+const getPreviousRangeBounds = (range: AnalyticsRange, sinceIso: string | null) => {
+  if (range === "all" || !sinceIso) return null;
+  const windowDays = getWindowDays(range);
+  if (!windowDays) return null;
+  const sinceDate = new Date(sinceIso);
+  const prevEnd = new Date(sinceDate.getTime() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - (windowDays - 1));
+  return { start: prevStart.toISOString(), end: prevEnd.toISOString() };
+};
+
+const buildSeries = (events: Array<{ created_at: string }>, range: AnalyticsRange) => {
   const map = new Map<string, number>();
   events.forEach((e) => {
     const key = new Date(e.created_at).toISOString().slice(0, 10);
     map.set(key, (map.get(key) ?? 0) + 1);
   });
-  return Array.from(map.entries())
+  if (range === "all") {
+    return Array.from(map.entries())
+      .sort(([a], [b]) => (a > b ? 1 : -1))
+      .map(([date, count]) => ({ date, count }));
+  }
+  const windowDays = getWindowDays(range);
+  if (!windowDays) {
+    return Array.from(map.entries())
     .sort(([a], [b]) => (a > b ? 1 : -1))
     .map(([date, count]) => ({ date, count }));
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - (windowDays - 1));
+
+  const series: Array<{ date: string; count: number }> = [];
+  for (let dt = new Date(start); dt <= today; dt.setDate(dt.getDate() + 1)) {
+    const key = dt.toISOString().slice(0, 10);
+    series.push({ date: key, count: map.get(key) ?? 0 });
+  }
+  return series;
 };
+
+const normalizeSearchValue = (value: string | null | undefined) =>
+  (value ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
 export async function loadAnalytics({
   restaurantId,
@@ -73,6 +135,7 @@ export async function loadAnalytics({
 }): Promise<AnalyticsResult> {
   const supabase = await createSupabaseServerClient();
   const since = getRangeStart(range);
+  const previousRange = getPreviousRangeBounds(range, since);
 
   const filters = (query: any) => {
     query = query.eq("restaurant_id", restaurantId);
@@ -80,33 +143,79 @@ export async function loadAnalytics({
     return query;
   };
 
-  const [eventsResp, categoriesResp, itemsResp] = await Promise.all([
-    filters(
+  const [eventsResp, categoriesResp, itemsResp, modifiersResp, previousDevicesResp, previousLanguagesResp] =
+    await Promise.all([
+      filters(
+        supabase
+          .from("analytics_events")
+          .select(
+            "event_type, category_id, item_id, device_type, language, metadata, created_at, session_id"
+          )
+      ),
+      supabase.from("categories").select("id, name_en").eq("restaurant_id", restaurantId),
       supabase
-        .from("analytics_events")
-        .select(
-          "event_type, category_id, item_id, device_type, language, metadata, created_at, session_id"
-        )
-    ),
-    supabase.from("categories").select("id, name_en").eq("restaurant_id", restaurantId),
-    supabase.from("items").select("id, name_en, category_id, is_featured").eq("restaurant_id", restaurantId),
-  ]);
+        .from("items")
+      .select(
+        "id, name_en, name_ar, description_en, description_ar, category_id, is_featured, contains_dairy, contains_nuts, contains_eggs, contains_shellfish, contains_soy, contains_sesame"
+      )
+      .eq("restaurant_id", restaurantId),
+      supabase.from("modifiers").select("id, name").eq("restaurant_id", restaurantId),
+      previousRange
+        ? supabase
+            .from("analytics_events")
+            .select("device_type")
+            .eq("restaurant_id", restaurantId)
+            .eq("event_type", "menu_view")
+            .gte("created_at", previousRange.start)
+            .lt("created_at", previousRange.end)
+        : Promise.resolve({ data: [] }),
+      previousRange
+        ? supabase
+            .from("analytics_events")
+            .select("language")
+            .eq("restaurant_id", restaurantId)
+            .eq("event_type", "menu_view")
+            .gte("created_at", previousRange.start)
+            .lt("created_at", previousRange.end)
+        : Promise.resolve({ data: [] }),
+    ]);
 
   const events = eventsResp.data ?? [];
   const categories = categoriesResp.data ?? [];
   const items = itemsResp.data ?? [];
+  const modifierGroups = modifiersResp.data ?? [];
+  const previousDeviceEvents =
+    (previousDevicesResp?.data as Array<{ device_type: string | null }> | undefined) ?? [];
+  const previousLanguageEvents =
+    (previousLanguagesResp?.data as Array<{ language: string | null }> | undefined) ?? [];
 
   const categoryName = new Map<string, string>();
   categories.forEach((c) => categoryName.set(c.id, c.name_en ?? "Uncategorized"));
 
-  const itemMeta = new Map<string, { name: string; categoryId: string | null; isFeatured: boolean }>();
-  items.forEach((it) =>
+  const itemMeta = new Map<
+    string,
+    {
+      name: string;
+      categoryId: string | null;
+      isFeatured: boolean;
+      searchFields: string[];
+    }
+  >();
+  items.forEach((it) => {
+    const categoryLabel = it.category_id ? categoryName.get(it.category_id) ?? "Uncategorized" : "";
     itemMeta.set(it.id, {
       name: it.name_en ?? "Unknown",
       categoryId: it.category_id,
       isFeatured: Boolean(it.is_featured),
-    })
-  );
+      searchFields: [
+        normalizeSearchValue(it.name_en),
+        normalizeSearchValue(it.name_ar),
+        normalizeSearchValue(it.description_en),
+        normalizeSearchValue(it.description_ar),
+        normalizeSearchValue(categoryLabel),
+      ].filter((value) => value.length > 0),
+    });
+  });
 
   const kpi = {
     menu_views: 0,
@@ -138,6 +247,7 @@ export async function loadAnalytics({
     sesame: 0,
   };
   const modifierCounts = new Map<string, { opens: number; selects: number; removes: number }>();
+  const modifierItemCounts = new Map<string, { opens: number; selects: number; removes: number }>();
 
   const menuViews = events.filter((e) => e.event_type === "menu_view");
 
@@ -211,6 +321,12 @@ export async function loadAnalytics({
         const current = modifierCounts.get(id) ?? { opens: 0, selects: 0, removes: 0 };
         current.opens += 1;
         modifierCounts.set(id, current);
+
+        if (e.item_id) {
+          const perItem = modifierItemCounts.get(e.item_id) ?? { opens: 0, selects: 0, removes: 0 };
+          perItem.opens += 1;
+          modifierItemCounts.set(e.item_id, perItem);
+        }
         break;
       }
       case "modifier_option_select": {
@@ -218,6 +334,11 @@ export async function loadAnalytics({
         const current = modifierCounts.get(id) ?? { opens: 0, selects: 0, removes: 0 };
         current.selects += 1;
         modifierCounts.set(id, current);
+        if (e.item_id) {
+          const perItem = modifierItemCounts.get(e.item_id) ?? { opens: 0, selects: 0, removes: 0 };
+          perItem.selects += 1;
+          modifierItemCounts.set(e.item_id, perItem);
+        }
         break;
       }
       case "modifier_option_remove": {
@@ -225,6 +346,11 @@ export async function loadAnalytics({
         const current = modifierCounts.get(id) ?? { opens: 0, selects: 0, removes: 0 };
         current.removes += 1;
         modifierCounts.set(id, current);
+        if (e.item_id) {
+          const perItem = modifierItemCounts.get(e.item_id) ?? { opens: 0, selects: 0, removes: 0 };
+          perItem.removes += 1;
+          modifierItemCounts.set(e.item_id, perItem);
+        }
         break;
       }
     }
@@ -252,12 +378,34 @@ export async function loadAnalytics({
     }
   });
 
-  const favoritesSeries = buildSeries(events.filter((e) => e.event_type === "menu_favorite"));
+  const favoritesSeries = buildSeries(events.filter((e) => e.event_type === "menu_favorite"), range);
 
   const topSearchTerms = Array.from(searchTermMap.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([term, count]) => ({ term, count }));
+
+  const zeroResultTerms = Array.from(searchTermMap.entries())
+    .reduce<Array<{ term: string; count: number }>>((acc, [term, count]) => {
+      const normalizedTerm = normalizeSearchValue(term);
+      if (!normalizedTerm) return acc;
+      const hasMatch = Array.from(itemMeta.values()).some((meta) =>
+        meta.searchFields.some((field) => field.includes(normalizedTerm))
+      );
+      if (!hasMatch) acc.push({ term, count });
+      return acc;
+    }, [])
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20);
+
+  const zeroResultsTotal = zeroResultTerms.reduce((sum, entry) => sum + entry.count, 0);
+  const searchConversion = {
+    totalSearches: kpi.searches,
+    zeroResults: zeroResultsTotal,
+    zeroRate: kpi.searches > 0 ? Math.round((zeroResultsTotal / kpi.searches) * 100) : 0,
+    favoriteRate: kpi.searches > 0 ? Math.round((kpi.favorites / kpi.searches) * 100) : 0,
+    viewRate: kpi.searches > 0 ? Math.round((kpi.item_views / kpi.searches) * 100) : 0,
+  };
 
   const categoriesResult = Array.from(categoryPerf.entries())
     .map(([categoryId, stats]) => ({
@@ -311,13 +459,49 @@ export async function loadAnalytics({
     }))
     .sort((a, b) => b.views - a.views);
 
+  const allergenKeys = ["dairy", "nuts", "eggs", "shellfish", "soy", "sesame"] as const;
+
   const allergens = Object.entries(allergenCounts)
-    .map(([allergen, count]) => ({ allergen, count }))
+    .map(([allergen, count]) => ({
+      allergen,
+      count,
+      percent: kpi.menu_views > 0 ? Math.round((count / kpi.menu_views) * 100) : 0,
+    }))
     .sort((a, b) => b.count - a.count);
 
+  const allergenHeatmap: Array<{ category: string; allergen: string; count: number }> = [];
+  categories.forEach((cat) => {
+    const catItems = items.filter((item) => item.category_id === cat.id);
+    allergenKeys.forEach((key) => {
+      const field = `contains_${key}` as const;
+      const count = catItems.filter((item) => Boolean((item as any)[field])).length;
+      allergenHeatmap.push({
+        category: categoryName.get(cat.id) ?? "Uncategorized",
+        allergen: key,
+        count,
+      });
+    });
+  });
+
+  const modifierNameMap = new Map<string, string>();
+  modifierGroups.forEach((group) => modifierNameMap.set(group.id, group.name));
+
   const modifiers = Array.from(modifierCounts.entries())
-    .map(([id, counts]) => ({ id, ...counts }))
+    .map(([id, counts]) => ({
+      id,
+      name: modifierNameMap.get(id) ?? "Modifier group",
+      ...counts,
+    }))
     .sort((a, b) => b.opens - a.opens);
+
+  const modifierItems = Array.from(modifierItemCounts.entries())
+    .map(([itemId, counts]) => ({
+      id: itemId,
+      name: itemMeta.get(itemId)?.name ?? "Menu item",
+      ...counts,
+    }))
+    .sort((a, b) => b.opens - a.opens)
+    .slice(0, 15);
 
   const funnelA = [
     { label: "Menu views", value: kpi.menu_views },
@@ -351,7 +535,7 @@ export async function loadAnalytics({
       ...kpi,
       unique_sessions: sessionSet.size || kpi.menu_views,
     },
-    viewsSeries: buildSeries(menuViews),
+    viewsSeries: buildSeries(menuViews, range),
     favoritesSeries,
     topSearchTerms,
     categories: categoriesResult,
@@ -359,13 +543,40 @@ export async function loadAnalytics({
     favoritesLeaderboard: favoritesLeaderboardArr,
     featured,
     allergens,
+    allergenHeatmap,
     modifiers,
+    modifierItems,
     funnels: { funnelA, funnelB },
     devices: [
       { label: "Mobile", value: deviceCounts.mobile },
       { label: "Desktop", value: deviceCounts.desktop },
       { label: "Tablet/Other", value: deviceCounts.tablet },
     ],
+    deviceTrends: previousDeviceEvents.length
+      ? Object.entries(
+          previousDeviceEvents.reduce<Record<string, number>>((acc, row) => {
+            const label =
+              row.device_type === "mobile"
+                ? "Mobile"
+                : row.device_type === "desktop"
+                  ? "Desktop"
+                  : "Tablet/Other";
+            acc[label] = (acc[label] ?? 0) + 1;
+            return acc;
+          }, {})
+        ).map(([label, value]) => ({ label, value }))
+      : undefined,
     languages: Array.from(languageCounts.entries()).map(([label, value]) => ({ label, value })),
+    languageTrends: previousLanguageEvents.length
+      ? Object.entries(
+          previousLanguageEvents.reduce<Record<string, number>>((acc, row) => {
+            const label = row.language ?? "unknown";
+            acc[label] = (acc[label] ?? 0) + 1;
+            return acc;
+          }, {})
+        ).map(([label, value]) => ({ label, value }))
+      : undefined,
+    searchZeroResults: zeroResultTerms,
+    searchConversion,
   };
 }

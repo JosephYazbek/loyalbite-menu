@@ -1,10 +1,18 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import {
+  ComponentType,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Activity,
+  ChevronRight,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -60,17 +68,47 @@ export function useAdminWorkspace() {
   return context
 }
 
-const NAV_LINKS = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { label: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
-  { label: "Branches", href: "/admin/branches", icon: MapPin },
-  { label: "Analytics", href: "/admin/analytics", icon: Activity },
-  { label: "Settings", href: "/admin/settings", icon: Settings },
+type NavItem =
+  | {
+      type: "link"
+      label: string
+      href: string
+      icon: ComponentType<{ className?: string }>
+    }
+  | {
+      type: "group"
+      label: string
+      icon: ComponentType<{ className?: string }>
+      children: { label: string; href: string }[]
+    }
+
+const NAV_ITEMS: NavItem[] = [
+  { type: "link", label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  {
+    type: "group",
+    label: "Menu",
+    icon: UtensilsCrossed,
+    children: [
+      { label: "Categories", href: "/admin/menu/categories" },
+      { label: "Items", href: "/admin/menu/items" },
+      { label: "Modifiers", href: "/admin/menu/modifiers" },
+    ],
+  },
+  { type: "link", label: "Branches", href: "/admin/branches", icon: MapPin },
+  { type: "link", label: "Analytics", href: "/admin/analytics", icon: Activity },
+  { type: "link", label: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 export function AdminShell({ user, memberships, children }: AdminShellProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const [openGroups, setOpenGroups] = useState<string[]>(() =>
+    NAV_ITEMS.filter(
+      (item): item is Extract<NavItem, { type: "group" }> =>
+        item.type === "group" &&
+        item.children.some((child) => pathname.startsWith(child.href))
+    ).map((item) => item.label)
+  )
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(
     memberships[0]?.restaurant.id ?? ""
   )
@@ -82,6 +120,26 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
       document.body.classList.remove("admin-shell")
     }
   }, [])
+
+  useEffect(() => {
+    const activeGroups = NAV_ITEMS.filter(
+      (item): item is Extract<NavItem, { type: "group" }> =>
+        item.type === "group" &&
+        item.children.some((child) => pathname.startsWith(child.href))
+    ).map((item) => item.label)
+
+    setOpenGroups((prev) => {
+      const merged = new Set(prev)
+      activeGroups.forEach((label) => merged.add(label))
+      return Array.from(merged)
+    })
+  }, [pathname])
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+    )
+  }
 
   const selectedMembership =
     memberships.find(
@@ -137,23 +195,78 @@ export function AdminShell({ user, memberships, children }: AdminShellProps) {
               </Link>
             </div>
             <nav className="flex-1 px-3 py-6 space-y-1">
-              {NAV_LINKS.map((link) => {
-                const Icon = link.icon
-                const active = pathname === link.href
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon
+
+                if (item.type === "link") {
+                  const active = pathname === item.href
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      {item.label}
+                    </Link>
+                  )
+                }
+
+                const isOpen = openGroups.includes(item.label)
+                const childActive = item.children.some((child) =>
+                  pathname.startsWith(child.href)
+                )
+
                 return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  <div key={item.label} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(item.label)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        childActive
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <span className="flex items-center gap-3">
+                        <Icon className="size-4" />
+                        {item.label}
+                      </span>
+                      <ChevronRight
+                        className={cn(
+                          "size-4 transition-transform",
+                          isOpen ? "rotate-90" : ""
+                        )}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="ml-6 space-y-1">
+                        {item.children.map((child) => {
+                          const childIsActive = pathname.startsWith(child.href)
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              className={cn(
+                                "flex items-center rounded-lg px-3 py-1.5 text-sm transition-colors",
+                                childIsActive
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {child.label}
+                            </Link>
+                          )
+                        })}
+                      </div>
                     )}
-                  >
-                    <Icon className="size-4" />
-                    {link.label}
-                  </Link>
+                  </div>
                 )
               })}
             </nav>

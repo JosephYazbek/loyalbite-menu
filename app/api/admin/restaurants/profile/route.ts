@@ -21,6 +21,7 @@ type RestaurantUpdate = {
   default_language?: "en" | "ar" | "both";
   logo_url?: string | null;
   cover_image_url?: string | null;
+  cover_url?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -118,6 +119,7 @@ export async function POST(request: Request) {
 
     if ("cover_image_url" in body) {
       updates.cover_image_url = normalizeText(body.cover_image_url);
+      updates.cover_url = updates.cover_image_url;
     }
 
     if ("profile_meta" in body) {
